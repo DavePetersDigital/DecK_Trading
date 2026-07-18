@@ -1,32 +1,36 @@
-# React + TypeScript + Vite
+# Deck Trading Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A local trading-assistant dashboard with a React/Vite client and Express API.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Install all workspace dependencies:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Run the client and server together:
+
+```bash
+npm run dev
+```
+
+- Dashboard: http://localhost:3001
+- API: http://localhost:3002
+- Health check: http://localhost:3002/api/health
+
+The Vite development server proxies `/api` requests to Express.
+
+## Project structure
+
+- `client/` — existing React, TypeScript and Vite dashboard
+- `server/` — Express and TypeScript API
+- `docs/` — supporting MT4 indicators
+
+## Validation
+
+```bash
+npm run build
+npm run lint
+```
