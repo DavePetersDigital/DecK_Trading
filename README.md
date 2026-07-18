@@ -19,8 +19,13 @@ npm run dev
 - Dashboard: http://localhost:3001
 - API: http://localhost:3002
 - Health check: http://localhost:3002/api/health
+- Version: http://localhost:3002/api/version
 
 The Vite development server proxies `/api` requests to Express.
+
+Development configuration is loaded from `.env.development`. Use
+`.env.example` as the reference for future local secrets; integrations and
+authentication remain intentionally unconfigured.
 
 ## Project structure
 

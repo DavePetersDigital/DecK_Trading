@@ -1,27 +1,16 @@
-import express from 'express'
+import { app } from './app.js'
+import { environment } from './config/environment.js'
+import { logger } from './utils/logger.js'
 
-const app = express()
-const port = Number(process.env.PORT ?? 3002)
-
-app.disable('x-powered-by')
-app.use(express.json())
-
-app.get('/api/health', (_request, response) => {
-  response.json({
-    status: 'ok',
-    service: 'deck-trading-dashboard-server',
-    timestamp: new Date().toISOString(),
-  })
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', reason)
 })
 
-app.get('/api/status', (_request, response) => {
-  response.json({
-    dataSource: 'mock',
-    cTrader: 'not-connected',
-    telegram: 'not-connected',
-  })
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception', error)
+  process.exit(1)
 })
 
-app.listen(port, 'localhost', () => {
-  console.log(`Deck Trading Dashboard API listening on http://localhost:${port}`)
+app.listen(environment.port, 'localhost', () => {
+  logger.info(`DecK Trading Dashboard API listening on http://localhost:${environment.port}`)
 })
