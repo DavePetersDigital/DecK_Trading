@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #d8e0e9;
+  background: #080d14;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --bg: #080d14;
+  --sidebar: #0a1019;
+  --panel: #0e1621;
+  --panel-raised: #111c28;
+  --border: #202d3b;
+  --border-soft: #172330;
+  --text: #d8e0e9;
+  --muted: #758598;
+  --faint: #526173;
+  --green: #35d089;
+  --amber: #e6ad45;
+  --red: #ed6673;
+  --blue: #438cf4;
+  --gold: #d5a84d;
+}
+
+:root[data-theme='slate'] {
+  --bg: #111820;
+  --sidebar: #151e28;
+  --panel: #19232e;
+  --panel-raised: #202c38;
+  --border: #304050;
+  --border-soft: #263542;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--bg); color: var(--text); }
+button, input, select { font: inherit; }
+button { color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+input, select {
+  width: 100%; background: #09111a; color: var(--text); border: 1px solid var(--border);
+  border-radius: 5px; padding: 9px 10px; font-family: 'IBM Plex Mono', monospace;
+}
+select { cursor: pointer; }
+h1, h2, p { margin: 0; }
+#root { min-height: 100vh; }
