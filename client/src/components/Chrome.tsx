@@ -1,5 +1,5 @@
-import type { View } from '../types'
-import { formatPrice } from '../utils/trading'
+import { useInstrumentStore } from '../context/InstrumentContext'
+import type { InstrumentWorkspaceState, View } from '../types'
 import { SessionBar } from './SessionComponents'
 
 export function StatusBadge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: string }) {
@@ -9,15 +9,19 @@ export function StatusBadge({ children, tone = 'neutral' }: { children: React.Re
 interface SidebarProps {
   view: View
   onNavigate: (view: View) => void
+  onInstrument: (symbol: string) => void
 }
 
-export function Sidebar({ view, onNavigate }: SidebarProps) {
+export function Sidebar({ view, onNavigate, onInstrument }: SidebarProps) {
+  const { instruments, selectedSymbol } = useInstrumentStore()
   const links: { id: View; label: string; icon: string }[] = [
     { id: 'overview', label: 'Overview', icon: '▦' },
-    { id: 'gold', label: 'Gold', icon: '◆' },
     { id: 'alerts', label: 'Alerts', icon: '◉' },
     { id: 'admin', label: 'Admin', icon: '⚙' },
   ]
+  const workspaceInstruments = instruments
+    .filter((instrument) => instrument.config.enabled && instrument.config.workspaceEnabled)
+    .sort((left, right) => left.config.symbol.localeCompare(right.config.symbol))
 
   return (
     <aside className="sidebar">
@@ -35,9 +39,12 @@ export function Sidebar({ view, onNavigate }: SidebarProps) {
       </nav>
       <div className="instrument-list">
         <p className="nav-label">Instruments</p>
-        <button className="instrument active" onClick={() => onNavigate('gold')}><span className="gold-dot" />XAUUSD</button>
-        {['USDJPY', 'EURUSD', 'NAS100'].map((item) => (
-          <button className="instrument" onClick={() => onNavigate('overview')} key={item}>{item}<small>Summary</small></button>
+        {workspaceInstruments.map((instrument) => (
+          <button className={`instrument ${view === 'instrument' && selectedSymbol === instrument.config.symbol ? 'active' : ''}`} onClick={() => onInstrument(instrument.config.symbol)} key={instrument.config.symbol}>
+            <span className={instrument.monitoring ? 'status-dot' : 'status-dot red'} />
+            {instrument.config.symbol}
+            <small>{instrument.config.category}</small>
+          </button>
         ))}
       </div>
       <div className="sidebar-status">
@@ -48,16 +55,10 @@ export function Sidebar({ view, onNavigate }: SidebarProps) {
   )
 }
 
-export function Header({ price, compact = false }: { price: number; compact?: boolean }) {
+export function Header({ instrument, view }: { instrument: InstrumentWorkspaceState; view: View }) {
   return (
     <header className="top-header">
-      <div className="symbol">
-        <div className="symbol-icon">Au</div>
-        <div><div><strong>XAUUSD</strong><span>Gold</span></div><small>Spot gold / U.S. Dollar</small></div>
-      </div>
-      {!compact && <div className="quote"><strong>{formatPrice(price)}</strong><span>+4.20 (+0.11%)</span></div>}
-      <SessionBar />
-      <div className="live-status"><i className="status-dot" />LIVE MOCK</div>
+      <SessionBar instrument={instrument} context={view === 'instrument' ? 'instrument' : view === 'overview' ? 'overview' : 'dashboard'} />
     </header>
   )
 }

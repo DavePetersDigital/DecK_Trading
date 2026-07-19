@@ -5,7 +5,7 @@ import type {
 } from '../types'
 
 export const formatPrice = (value: number, digits = 2) => value.toFixed(digits)
-export const formatDistance = (value: number) => Math.abs(value).toFixed(2)
+export const formatDistance = (value: number, decimals = 2) => Math.abs(value).toFixed(decimals)
 export const currentTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 export const isApproaching = (price: number, level: number, distance: number) => Math.abs(level - price) <= distance
 
@@ -83,7 +83,7 @@ export function calculateInstrumentAttentionStatus(
   return 'WAITING'
 }
 
-export function calculateGoldStatus(monitoring: boolean, sessionOpen: boolean, nearest: PlannedLevel | null, price: number): StrategyStatus {
+export function calculateInstrumentStatus(monitoring: boolean, sessionOpen: boolean, nearest: PlannedLevel | null, price: number): StrategyStatus {
   const attention = calculateInstrumentAttentionStatus(monitoring, sessionOpen, nearest, price)
   if (attention === 'ACTION REQUIRED') return 'WATCH M1'
   if (attention === 'WAITING' || attention === 'WATCH') return 'MONITORING'
@@ -157,7 +157,7 @@ export const statusTone = (status: string) => {
   if (status.includes('ACTION') || status === 'PASSED') return 'danger'
   if (status.includes('APPROACH') || status.includes('WATCH') || status === 'IN ZONE') return 'warning'
   if (status.includes('MONITORING') || status.includes('ACTIVE') || status.includes('CONFIRMED')) return 'positive'
-  if (status.includes('OFF') || status.includes('CLOSED') || status === 'DISABLED') return 'danger'
+  if (status.includes('OFF') || status.includes('CLOSED') || status === 'DISABLED') return 'neutral'
   return 'neutral'
 }
 

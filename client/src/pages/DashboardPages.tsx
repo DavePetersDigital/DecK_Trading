@@ -2,76 +2,46 @@ import { useRef } from 'react'
 import { AlertsCard, Card, Toggle } from '../components/Cards'
 import { StatusBadge } from '../components/Chrome'
 import {
-  DailyPlanWorkspace, GoldOverview, HistoryWorkspace, InstrumentSummaryCard,
-  ManipulationWorkspace, OrbWorkspace, StructureWorkspace,
+  InstrumentDailyPlanWorkspace, InstrumentHistoryWorkspace, InstrumentManipulationWorkspace,
+  InstrumentOperationalSubtitle, InstrumentOrbWorkspace, InstrumentOverview, InstrumentStructureWorkspace,
 } from '../components/TradingAssistantPanels'
-import { useGold } from '../context/GoldContext'
-import { otherInstruments } from '../data/mockData'
-import { useGoldInstrument } from '../hooks/useGoldInstrument'
-import { useSession } from '../hooks/useSession'
-import type { AppSettings, GoldTab, Instrument, InstrumentStatus } from '../types'
-import { statusPriority } from '../utils/trading'
+import { MarketCommandCentre } from '../components/MarketCommandCentre'
+import { InstrumentManagement } from '../components/InstrumentManagement'
+import { useInstrumentWorkspace } from '../context/InstrumentContext'
+import type { AppSettings, InstrumentTab } from '../types'
 
-export function OverviewPage({ onOpenGold }: { onOpenGold: () => void }) {
-  const goldInstrument = useGoldInstrument()
-  const session = useSession()
-  const sessionStatus = (id: 'tokyo' | 'london' | 'newYork'): InstrumentStatus =>
-    session.sessions[id].isActive || session.sessions[id].state === 'OPENING_SOON'
-      ? 'WATCH'
-      : 'SESSION CLOSED'
-  const statuses: InstrumentStatus[] = [sessionStatus('tokyo'), sessionStatus('london'), sessionStatus('newYork')]
-  const instruments: Instrument[] = [
-    goldInstrument,
-    ...otherInstruments.map((instrument, index) => ({ ...instrument, status: statuses[index] })),
-  ].sort((a, b) => statusPriority[a.status] - statusPriority[b.status])
-  const attention = instruments.filter((instrument) => instrument.status === 'ACTION REQUIRED' || instrument.status === 'WATCH').length
-  const approaching = instruments.filter((instrument) => instrument.status === 'APPROACHING').length
-  const waiting = instruments.filter((instrument) => instrument.status === 'WAITING' || instrument.status === 'SESSION CLOSED').length
-  const gold = useGold()
-
-  return (
-    <main className="content">
-      <div className="command-header">
-        <div><span>Market Command Centre</span><h1>Markets ranked by current trading relevance.</h1></div>
-        <div className="command-stats">
-          <div><strong>{attention}</strong><span>Need attention</span></div>
-          <div><strong>{approaching}</strong><span>Approaching</span></div>
-          <div><strong>{waiting}</strong><span>Waiting</span></div>
-          <div><StatusBadge tone={gold.monitoring ? 'positive' : 'danger'}>{gold.monitoring ? 'Monitoring on' : 'Monitoring off'}</StatusBadge><span>Master state</span></div>
-        </div>
-      </div>
-      <div className="instrument-grid">
-        {instruments.map((instrument) => <InstrumentSummaryCard instrument={instrument} onOpen={instrument.symbol === 'XAUUSD' ? onOpenGold : undefined} key={instrument.symbol} />)}
-      </div>
-    </main>
-  )
+export function OverviewPage({ onOpenInstrument }: { onOpenInstrument: (symbol: string) => void }) {
+  return <MarketCommandCentre onOpenInstrument={onOpenInstrument} />
 }
 
-export function GoldPage({ tab, onTab }: { tab: GoldTab; onTab: (tab: GoldTab) => void }) {
-  const tabs: { id: GoldTab; label: string }[] = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'orb', label: 'ORB' },
-    { id: 'plan', label: 'Daily Plan' },
-    { id: 'structure', label: 'Structure' },
-    { id: 'manipulation', label: 'Manipulation' },
-    { id: 'history', label: 'History' },
+export function InstrumentPage({ tab, onTab }: { tab: InstrumentTab; onTab: (tab: InstrumentTab) => void }) {
+  const instrument = useInstrumentWorkspace()
+  const allTabs: { id: InstrumentTab; label: string; enabled: boolean }[] = [
+    { id: 'overview', label: 'Overview', enabled: true },
+    { id: 'orb', label: 'ORB', enabled: instrument.config.strategies.orb },
+    { id: 'plan', label: 'Daily Plan', enabled: instrument.config.strategies.dailyPlan },
+    { id: 'structure', label: 'Structure', enabled: instrument.config.strategies.structure },
+    { id: 'manipulation', label: 'Manipulation', enabled: instrument.config.strategies.manipulation },
+    { id: 'history', label: 'History', enabled: true },
   ]
+  const tabs = allTabs.filter((item) => item.enabled)
+  const activeTab = tabs.some((item) => item.id === tab) ? tab : 'overview'
   return (
     <main className="content">
-      <div className="page-intro"><div><span>Instrument workspace</span><h1>Gold / XAUUSD</h1><p>Decision support, strategy state and operational next actions.</p></div></div>
-      <div className="tabs" role="tablist">{tabs.map((item) => <button role="tab" aria-selected={tab === item.id} className={tab === item.id ? 'active' : ''} onClick={() => onTab(item.id)} key={item.id}>{item.label}</button>)}</div>
-      {tab === 'overview' && <GoldOverview onTab={onTab} />}
-      {tab === 'orb' && <OrbWorkspace />}
-      {tab === 'plan' && <DailyPlanWorkspace />}
-      {tab === 'structure' && <StructureWorkspace />}
-      {tab === 'manipulation' && <ManipulationWorkspace />}
-      {tab === 'history' && <HistoryWorkspace />}
+      <div className="page-intro gold-page-intro"><div><span>Instrument workspace</span><h1>{instrument.config.shortName} / {instrument.config.symbol}</h1><InstrumentOperationalSubtitle /></div></div>
+      <div className="tabs" role="tablist">{tabs.map((item) => <button role="tab" aria-selected={activeTab === item.id} className={activeTab === item.id ? 'active' : ''} onClick={() => onTab(item.id)} key={item.id}>{item.label}</button>)}</div>
+      {activeTab === 'overview' && <InstrumentOverview onTab={onTab} />}
+      {activeTab === 'orb' && <InstrumentOrbWorkspace />}
+      {activeTab === 'plan' && <InstrumentDailyPlanWorkspace />}
+      {activeTab === 'structure' && <InstrumentStructureWorkspace />}
+      {activeTab === 'manipulation' && <InstrumentManipulationWorkspace />}
+      {activeTab === 'history' && <InstrumentHistoryWorkspace />}
     </main>
   )
 }
 
 export function AlertsPage() {
-  const gold = useGold()
+  const gold = useInstrumentWorkspace()
   return (
     <main className="content">
       <div className="page-intro"><div><span>Monitoring control</span><h1>Alerts</h1><p>Configure local monitoring and review alert activity.</p></div></div>
@@ -108,10 +78,10 @@ export function AdminPage({ settings, onSettings }: { settings: AppSettings; onS
   return (
     <main className="content">
       <div className="page-intro"><div><span>System configuration</span><h1>Admin</h1><p>Local preferences and future service integrations.</p></div></div>
+      <InstrumentManagement />
       <div className="settings-grid">
         <Card title="Appearance" eyebrow="Interface"><div className="setting-line"><div><strong>Interface theme</strong><span>Choose terminal contrast</span></div><select aria-label="Interface theme" value={settings.theme} onChange={(e) => onSettings({ ...settings, theme: e.target.value as AppSettings['theme'] })}><option value="dark">Deep navy</option><option value="slate">Slate dark</option></select></div></Card>
         <Card title="Alert defaults" eyebrow="Monitoring"><label className="admin-field">Default approach distance<input type="number" min="0.1" step="0.1" value={settings.defaultApproachDistance} onChange={(e) => onSettings({ ...settings, defaultApproachDistance: Number(e.target.value) })} /></label></Card>
-        <Card title="Instruments" eyebrow="Defaults"><div className="setting-line"><div><strong>Four instruments monitored</strong><span>XAUUSD workspace active; others use mock summaries</span></div><StatusBadge tone="positive">Active</StatusBadge></div></Card>
         <Card title="Sessions" eyebrow="Defaults"><div className="setting-line"><div><strong>Three market sessions</strong><span>Tokyo, London and New York</span></div><StatusBadge tone="positive">Active</StatusBadge></div></Card>
         {['cTrader API', 'Telegram'].map((name) => <Card title={name} eyebrow="Integration" key={name}><div className="setting-line"><div><strong>Not connected</strong><span>Credentials have not been configured</span></div><button className="secondary" disabled>Connect</button></div></Card>)}
         <Card title="Backup and restore" eyebrow="Local settings" className="backup-card"><p className="card-copy">Export your current preferences or restore them from a Deck Trading Dashboard JSON backup.</p><div className="button-row"><button className="primary" onClick={exportSettings}>Export JSON</button><button className="secondary" onClick={() => fileRef.current?.click()}>Import JSON</button><input ref={fileRef} className="hidden-input" type="file" accept=".json,application/json" onChange={(e) => void importSettings(e.target.files?.[0])} aria-label="Import settings JSON" /></div></Card>

@@ -1,8 +1,47 @@
-export type View = 'overview' | 'gold' | 'alerts' | 'admin'
-export type GoldTab = 'overview' | 'orb' | 'plan' | 'structure' | 'manipulation' | 'history'
+import type { SessionId } from './session'
+
+export type View = 'overview' | 'instrument' | 'alerts' | 'admin'
+export type InstrumentTab = 'overview' | 'orb' | 'plan' | 'structure' | 'manipulation' | 'history'
+export type GoldTab = InstrumentTab
 export type Theme = 'dark' | 'slate'
 export type Bias = 'Bullish' | 'Bearish' | 'Neutral'
 export type Direction = 'Buy' | 'Sell'
+export type InstrumentCategory = 'Metal' | 'Forex' | 'Index' | 'Energy' | 'Crypto' | 'Other'
+export type InstrumentDataSource = 'Mock' | 'Live' | 'Disconnected'
+
+export interface InstrumentStrategies {
+  dailyPlan: boolean
+  orb: boolean
+  structure: boolean
+  manipulation: boolean
+}
+
+export interface InstrumentConfiguration {
+  id: string
+  symbol: string
+  displayName: string
+  shortName: string
+  iconText?: string
+  category: InstrumentCategory
+  enabled: boolean
+  workspaceEnabled: boolean
+  preferredSession: SessionId
+  priceDecimals: number
+  pipSize: number
+  pointSize: number
+  priceStep: number
+  defaultApproachDistance: number
+  defaultEntryTolerance: number
+  strategies: InstrumentStrategies
+  sessionConfiguration: {
+    openingSoonMinutes: number
+    closingSoonMinutes: number
+  }
+  ctraderSymbolId?: number
+  ctraderSymbolName?: string
+  createdAt: string
+  updatedAt: string
+}
 export type InstrumentStatus =
   | 'ACTION REQUIRED' | 'APPROACHING' | 'WATCH' | 'WAITING'
   | 'SESSION CLOSED' | 'MONITORING OFF'
@@ -35,6 +74,8 @@ export interface DailyPlan {
   approachDistance: number
   entryTolerance: number
   lastSaved: string | null
+  notes?: string
+  dateSessionLabel?: string
 }
 
 export interface PriceLevel {
@@ -44,7 +85,7 @@ export interface PriceLevel {
 }
 
 export interface OrbData {
-  session: 'London'
+  session: string
   high: number
   low: number
   dailyAtr: number
@@ -55,7 +96,7 @@ export interface OrbData {
 }
 
 export interface ManipulationData {
-  session: 'London'
+  session: string
   firstCandleHigh: number
   firstCandleLow: number
   dailyAtr: number
@@ -129,6 +170,18 @@ export interface GoldState {
   alerts: Alert[]
   history: ActivityEvent[]
   lastStatusUpdate: string
+}
+
+export interface InstrumentWorkspaceState extends GoldState {
+  config: InstrumentConfiguration
+  dailyChange: number
+  dataSourceStatus: InstrumentDataSource
+}
+
+export interface InstrumentStoreState {
+  version: 1
+  instruments: Record<string, InstrumentWorkspaceState>
+  adminHistory: ActivityEvent[]
 }
 
 export interface AppSettings {

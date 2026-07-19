@@ -1,4 +1,4 @@
-import type { Alert, AppSettings, DailyPlan, Instrument, ManipulationData, OrbData, StructureData } from '../types'
+import type { Alert, AppSettings, DailyPlan, ManipulationData, OrbData, StructureData } from '../types'
 
 export const BASE_PRICE = 3988.6
 
@@ -52,29 +52,3 @@ export const initialAlerts: Alert[] = [
   { id: '3', time: '08:00', type: 'SYSTEM', message: 'Daily plan loaded', status: 'Info' },
 ]
 
-export const otherInstruments: Omit<Instrument, 'status'>[] = [
-  {
-    symbol: 'USDJPY', name: 'U.S. Dollar / Japanese Yen', price: 149.84, dailyChange: -0.18,
-    bias: 'Bearish', session: 'Tokyo Closed',
-    strategies: [{ name: 'Daily Plan', status: 'Waiting' }, { name: 'Session Levels', status: 'No active setup' }],
-    nextEvent: 'London opens in 42 minutes',
-  },
-  {
-    symbol: 'EURUSD', name: 'Euro / U.S. Dollar', price: 1.0864, dailyChange: 0.12,
-    bias: 'Bullish', session: 'London Open',
-    strategies: [{ name: 'Daily Plan', status: 'Watch pullback' }, { name: 'ORB', status: 'Range building' }],
-    nextEvent: 'Watch support at 1.0840 — 0.0024 away',
-  },
-  {
-    symbol: 'NAS100', name: 'Nasdaq 100', price: 21842.6, dailyChange: 0.46,
-    bias: 'Bullish', session: 'New York Closed',
-    strategies: [{ name: 'Daily Plan', status: 'Waiting' }, { name: 'Opening Drive', status: 'Session closed' }],
-    nextEvent: 'New York opens in 1h 42m',
-  },
-]
-
-export const sessions = [
-  { name: 'Tokyo', state: 'Closed', time: '09:00 – 18:00 JST', countdown: 'Opens in 05:18', tone: 'closed' },
-  { name: 'London', state: 'Open', time: '08:00 – 16:30 BST', countdown: 'Closes in 02:12', tone: 'open' },
-  { name: 'New York', state: 'Closed', time: '08:00 – 17:00 EDT', countdown: 'Opens in 01:42', tone: 'closed' },
-] as const
