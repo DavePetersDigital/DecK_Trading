@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
 import type { View } from '../types'
 import { formatPrice } from '../utils/trading'
+import { SessionBar } from './SessionComponents'
 
 export function StatusBadge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: string }) {
   return <span className={`badge badge--${tone}`}>{children}</span>
@@ -49,12 +49,6 @@ export function Sidebar({ view, onNavigate }: SidebarProps) {
 }
 
 export function Header({ price, compact = false }: { price: number; compact?: boolean }) {
-  const [clock, setClock] = useState(new Date())
-  useEffect(() => {
-    const id = window.setInterval(() => setClock(new Date()), 1000)
-    return () => window.clearInterval(id)
-  }, [])
-
   return (
     <header className="top-header">
       <div className="symbol">
@@ -62,15 +56,8 @@ export function Header({ price, compact = false }: { price: number; compact?: bo
         <div><div><strong>XAUUSD</strong><span>Gold</span></div><small>Spot gold / U.S. Dollar</small></div>
       </div>
       {!compact && <div className="quote"><strong>{formatPrice(price)}</strong><span>+4.20 (+0.11%)</span></div>}
-      <div className="header-right">
-        <div className="session-badges">
-          <StatusBadge>Tokyo · Closed</StatusBadge>
-          <StatusBadge tone="positive">London · Open</StatusBadge>
-          <StatusBadge>New York · Closed</StatusBadge>
-        </div>
-        <div className="live-status"><i className="status-dot" />LIVE MOCK</div>
-        <time>{clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}<small>Local time</small></time>
-      </div>
+      <SessionBar />
+      <div className="live-status"><i className="status-dot" />LIVE MOCK</div>
     </header>
   )
 }

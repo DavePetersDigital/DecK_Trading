@@ -8,12 +8,18 @@ import {
 import { useGold } from '../context/GoldContext'
 import { otherInstruments } from '../data/mockData'
 import { useGoldInstrument } from '../hooks/useGoldInstrument'
+import { useSession } from '../hooks/useSession'
 import type { AppSettings, GoldTab, Instrument, InstrumentStatus } from '../types'
 import { statusPriority } from '../utils/trading'
 
 export function OverviewPage({ onOpenGold }: { onOpenGold: () => void }) {
   const goldInstrument = useGoldInstrument()
-  const statuses: InstrumentStatus[] = ['SESSION CLOSED', 'WATCH', 'SESSION CLOSED']
+  const session = useSession()
+  const sessionStatus = (id: 'tokyo' | 'london' | 'newYork'): InstrumentStatus =>
+    session.sessions[id].isActive || session.sessions[id].state === 'OPENING_SOON'
+      ? 'WATCH'
+      : 'SESSION CLOSED'
+  const statuses: InstrumentStatus[] = [sessionStatus('tokyo'), sessionStatus('london'), sessionStatus('newYork')]
   const instruments: Instrument[] = [
     goldInstrument,
     ...otherInstruments.map((instrument, index) => ({ ...instrument, status: statuses[index] })),

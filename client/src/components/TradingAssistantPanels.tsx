@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useGold } from '../context/GoldContext'
 import type { ActivityCategory, Bias, GoldTab, Instrument, PlannedLevel } from '../types'
+import type { SessionId } from '../types/session'
 import {
   calculateGoldStatus, calculateLevelStatus,
   calculateManipulationClassification, calculateNearestLevel,
@@ -9,8 +10,27 @@ import {
 } from '../utils/trading'
 import { Card, Toggle } from './Cards'
 import { StatusBadge } from './Chrome'
+import { SessionStatusCard } from './SessionComponents'
+import { useSession } from '../hooks/useSession'
+import { formatSessionDuration } from '../services/sessionEngine'
 
 export function InstrumentSummaryCard({ instrument, onOpen }: { instrument: Instrument; onOpen?: () => void }) {
+  const sessionEngine = useSession()
+  const sessionByInstrument: Record<string, SessionId> = {
+    XAUUSD: 'london',
+    USDJPY: 'tokyo',
+    EURUSD: 'london',
+    NAS100: 'newYork',
+  }
+  const tradingSession = sessionEngine.sessions[sessionByInstrument[instrument.symbol] ?? 'london']
+  const sessionActive = tradingSession.isActive
+  const sessionState = tradingSession.state.replace('_', ' ')
+  const sessionLabel = `${tradingSession.name} ${sessionState}`
+  const sessionCountdown = `${sessionActive ? 'Closes' : 'Opens'} in ${formatSessionDuration(tradingSession.timeRemaining)}`
+  const nextEvent = instrument.status === 'SESSION CLOSED' || tradingSession.state === 'OPENING_SOON'
+    ? `${tradingSession.name} opens in ${formatSessionDuration(tradingSession.timeRemaining)}`
+    : instrument.nextEvent
+
   return (
     <article className={`instrument-card status-${statusTone(instrument.status)}`} onClick={onOpen}>
       <div className="instrument-card-head">
@@ -19,16 +39,19 @@ export function InstrumentSummaryCard({ instrument, onOpen }: { instrument: Inst
       </div>
       <div className="instrument-priority">
         <span>Next event</span>
-        <strong>{instrument.nextEvent}</strong>
+        <strong>{nextEvent}</strong>
+      </div>
+      <div className={`instrument-session session-${tradingSession.classification}`}>
+        <div><span>{sessionLabel}</span><strong>{sessionCountdown}</strong></div>
+        {sessionActive && <div className="instrument-session-progress" aria-label={`${tradingSession.name} session ${tradingSession.progressPercentage.toFixed(0)}% complete`}><i style={{ width: `${tradingSession.progressPercentage}%` }} /></div>}
       </div>
       <div className="instrument-meta">
         <div><span>Bias</span><b>{instrument.bias}</b></div>
-        <div><span>Session</span><b>{instrument.session}</b></div>
         <div><span>Price</span><b>{formatPrice(instrument.price, instrument.symbol === 'EURUSD' ? 4 : 2)}</b></div>
         <div><span>Today</span><b className={instrument.dailyChange >= 0 ? 'positive-text' : 'danger-text'}>{instrument.dailyChange >= 0 ? '+' : ''}{instrument.dailyChange.toFixed(2)}%</b></div>
       </div>
       <div className="strategy-lines">
-        {instrument.strategies.map((strategy) => <div key={strategy.name}><span>{strategy.name}</span><strong>{strategy.status}</strong></div>)}
+        {instrument.strategies.map((strategy) => <div key={strategy.name}><span><i className={`strategy-indicator indicator-${statusTone(strategy.status.toUpperCase())}`} />{strategy.name}</span><strong>{strategy.status}</strong></div>)}
       </div>
       <button className="open-instrument" disabled={!onOpen} onClick={(event) => { event.stopPropagation(); onOpen?.() }}>
         {onOpen ? 'Open Instrument' : 'Workspace not configured'}
@@ -39,9 +62,11 @@ export function InstrumentSummaryCard({ instrument, onOpen }: { instrument: Inst
 
 export function GoldOverview({ onTab }: { onTab: (tab: GoldTab) => void }) {
   const gold = useGold()
+  const session = useSession()
+  const london = session.sessions.london
   const nearest = calculateNearestLevel(gold.price, gold.plan.levels)
-  const status = calculateGoldStatus(gold.monitoring, true, nearest, gold.price)
-  const next = calculateNextAction(gold.monitoring, true, nearest, gold.price, gold.orb, gold.manipulation)
+  const status = calculateGoldStatus(gold.monitoring, london.isActive, nearest, gold.price)
+  const next = calculateNextAction(gold.monitoring, london.isActive, nearest, gold.price, gold.orb, gold.manipulation)
   const distance = nearest ? Math.abs(nearest.price - gold.price) : null
   const orbDistance = Math.min(Math.abs(gold.price - gold.orb.high), Math.abs(gold.price - gold.orb.low))
   const manipulation = calculateManipulationClassification(gold.manipulation)
@@ -53,7 +78,7 @@ export function GoldOverview({ onTab }: { onTab: (tab: GoldTab) => void }) {
       : 'No enabled daily-plan level is available.'
 
   const conditions = [
-    ['Session active', true, 'London open'],
+    ['Session active', london.isActive, `${london.name} ${london.state.replace('_', ' ').toLowerCase()}`],
     ['Daily plan loaded', gold.plan.levels.length > 0, `${gold.plan.levels.length} levels`],
     ['Monitoring enabled', gold.monitoring, gold.monitoring ? 'On' : 'Off'],
     ['Price near a level', levelStatus === 'APPROACHING' || levelStatus === 'ALERT SENT' || levelStatus === 'IN ZONE', levelStatus],
@@ -66,7 +91,7 @@ export function GoldOverview({ onTab }: { onTab: (tab: GoldTab) => void }) {
   return (
     <div className="gold-overview-layout">
       <section className={`primary-status status-${statusTone(status)}`}>
-        <div className="primary-status-top"><span>Primary status · London open</span><StatusBadge tone={statusTone(status)}>{status}</StatusBadge></div>
+        <div className="primary-status-top"><span>Primary status · {london.name} {london.state.replace('_', ' ').toLowerCase()}</span><StatusBadge tone={statusTone(status)}>{status}</StatusBadge></div>
         <div className="primary-status-main">
           <div><small>Current price</small><strong>{formatPrice(gold.price)}</strong></div>
           <div><small>Nearest level</small><strong>{nearest ? formatPrice(nearest.price) : '—'}</strong></div>
@@ -80,6 +105,8 @@ export function GoldOverview({ onTab }: { onTab: (tab: GoldTab) => void }) {
       <Card title="Next Action" eyebrow="Operational instruction" className="next-action-card" action={<StatusBadge tone={statusTone(status)}>{next.action}</StatusBadge>}>
         <div className="next-action-content"><strong>{next.action}</strong><p>{next.detail}</p></div>
       </Card>
+
+      <SessionStatusCard />
 
       <div className="strategy-summary-grid">
         <button className="strategy-panel" onClick={() => onTab('plan')}>
@@ -105,7 +132,7 @@ export function GoldOverview({ onTab }: { onTab: (tab: GoldTab) => void }) {
 
       <Card title="Market Context" eyebrow="Compact session data">
         <div className="context-grid">
-          {[['Price', formatPrice(gold.price)], ['Daily bias', gold.plan.bias], ['Daily range', '25.20'], ['Daily ATR', '42.80'], ['Session', 'London'], ['Time remaining', '02:12']].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+          {[['Price', formatPrice(gold.price)], ['Daily bias', gold.plan.bias], ['Daily range', '25.20'], ['Daily ATR', '42.80'], ['Session', `${london.name} ${london.state.replace('_', ' ')}`], ['Time remaining', formatSessionDuration(london.timeRemaining)]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
         </div>
       </Card>
     </div>
