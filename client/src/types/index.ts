@@ -25,7 +25,11 @@ export interface InstrumentConfiguration {
   category: InstrumentCategory
   enabled: boolean
   workspaceEnabled: boolean
-  preferredSession: SessionId
+  monitoredSessions: SessionId[]
+  strategySessions: {
+    orb: SessionId[]
+    manipulation: SessionId[]
+  }
   priceDecimals: number
   pipSize: number
   pointSize: number

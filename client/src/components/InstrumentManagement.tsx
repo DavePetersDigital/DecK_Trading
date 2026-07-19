@@ -5,10 +5,16 @@ import { createInitialInstrumentStore, INSTRUMENT_STORE_KEY } from '../services/
 import type {
   InstrumentCategory, InstrumentConfiguration, InstrumentStoreState, InstrumentWorkspaceState,
 } from '../types'
+import type { SessionId } from '../types/session'
 import { Card, Toggle } from './Cards'
 import { StatusBadge } from './Chrome'
 
 const categories: InstrumentCategory[] = ['Metal', 'Forex', 'Index', 'Energy', 'Crypto', 'Other']
+const sessionOptions: { id: SessionId; label: string }[] = [
+  { id: 'tokyo', label: 'Tokyo' },
+  { id: 'london', label: 'London' },
+  { id: 'newYork', label: 'New York' },
+]
 
 function newConfiguration(): InstrumentConfiguration {
   return createInstrumentConfiguration({
@@ -22,8 +28,9 @@ function newConfiguration(): InstrumentConfiguration {
   })
 }
 
-function sessionLabel(session: InstrumentConfiguration['preferredSession']) {
-  return session === 'newYork' ? 'New York' : session[0].toUpperCase() + session.slice(1)
+function sessionsLabel(sessions: InstrumentConfiguration['monitoredSessions']) {
+  if (sessions.length === sessionOptions.length) return 'All sessions'
+  return sessions.map((session) => sessionOptions.find((option) => option.id === session)?.label ?? session).join(' · ')
 }
 
 function InstrumentForm({ editing, onClose }: { editing?: InstrumentWorkspaceState; onClose: () => void }) {
@@ -33,12 +40,25 @@ function InstrumentForm({ editing, onClose }: { editing?: InstrumentWorkspaceSta
   const [error, setError] = useState('')
   const patch = (change: Partial<InstrumentConfiguration>) => setConfig((old) => ({ ...old, ...change }))
   const numeric = (key: keyof InstrumentConfiguration, value: string) => patch({ [key]: Number(value) })
+  const toggleMonitoredSession = (session: SessionId, enabled: boolean) => setConfig((old) => ({
+    ...old,
+    monitoredSessions: enabled
+      ? [...new Set([...old.monitoredSessions, session])]
+      : old.monitoredSessions.filter((item) => item !== session),
+    strategySessions: enabled ? old.strategySessions : {
+      orb: old.strategySessions.orb.filter((item) => item !== session),
+      manipulation: old.strategySessions.manipulation.filter((item) => item !== session),
+    },
+  }))
 
   const save = () => {
     const symbol = config.symbol.trim().toUpperCase()
     if (!symbol || !/^[A-Z0-9._-]+$/.test(symbol)) return setError('Enter a valid symbol using letters, numbers, dots, dashes or underscores.')
     if (!config.displayName.trim() || !config.shortName.trim()) return setError('Display name and short name are required.')
     if (!editing && store.getInstrumentState(symbol)) return setError(`${symbol} already exists.`)
+    if (!config.monitoredSessions.length) return setError('Select at least one monitored session.')
+    if (config.strategies.orb && !config.strategySessions.orb.length) return setError('Select an ORB session or disable the ORB strategy.')
+    if (config.strategies.manipulation && !config.strategySessions.manipulation.length) return setError('Select a Manipulation session or disable that strategy.')
     const validNumbers = Number.isInteger(config.priceDecimals) && config.priceDecimals >= 0 && config.priceDecimals <= 8 &&
       [config.pipSize, config.pointSize, config.priceStep].every((value) => Number.isFinite(value) && value > 0) &&
       [config.defaultApproachDistance, config.defaultEntryTolerance].every((value) => Number.isFinite(value) && value >= 0)
@@ -66,7 +86,9 @@ function InstrumentForm({ editing, onClose }: { editing?: InstrumentWorkspaceSta
             const category = event.target.value as InstrumentCategory
             patch({ category, ...categoryDefaults[category] })
           }}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
-          <label>Preferred session<select value={config.preferredSession} onChange={(event) => patch({ preferredSession: event.target.value as InstrumentConfiguration['preferredSession'] })}><option value="tokyo">Tokyo</option><option value="london">London</option><option value="newYork">New York</option></select></label>
+          <fieldset className="monitored-session-selector"><legend>Monitored sessions</legend>{sessionOptions.map((session) => <label key={session.id}><input type="checkbox" checked={config.monitoredSessions.includes(session.id)} onChange={(event) => toggleMonitoredSession(session.id, event.target.checked)} />{session.label}</label>)}</fieldset>
+          {config.strategies.orb && <label>ORB session<select value={config.strategySessions.orb[0] ?? ''} onChange={(event) => patch({ strategySessions: { ...config.strategySessions, orb: event.target.value ? [event.target.value as SessionId] : [] } })}><option value="">Select session</option>{sessionOptions.filter((session) => config.monitoredSessions.includes(session.id)).map((session) => <option value={session.id} key={session.id}>{session.label}</option>)}</select></label>}
+          {config.strategies.manipulation && <label>Manipulation session<select value={config.strategySessions.manipulation[0] ?? ''} onChange={(event) => patch({ strategySessions: { ...config.strategySessions, manipulation: event.target.value ? [event.target.value as SessionId] : [] } })}><option value="">Select session</option>{sessionOptions.filter((session) => config.monitoredSessions.includes(session.id)).map((session) => <option value={session.id} key={session.id}>{session.label}</option>)}</select></label>}
           <label>Price decimals<input type="number" min="0" max="8" step="1" value={config.priceDecimals} onChange={(event) => numeric('priceDecimals', event.target.value)} /></label>
           <label>Pip size<input type="number" min="0" step="any" value={config.pipSize} onChange={(event) => numeric('pipSize', event.target.value)} /></label>
           <label>Point size<input type="number" min="0" step="any" value={config.pointSize} onChange={(event) => numeric('pointSize', event.target.value)} /></label>
@@ -135,14 +157,14 @@ export function InstrumentManagement() {
           <div><button className="secondary" onClick={exportInstruments}>Export Instruments</button><button className="secondary" onClick={() => fileRef.current?.click()}>Import Instruments</button><input ref={fileRef} className="hidden-input" type="file" accept=".json,application/json" onChange={(event) => void previewImport(event.target.files?.[0])} /></div>
         </div>
         <div className="instrument-table">
-          <div className="instrument-table-head"><span>Symbol</span><span>Name</span><span>Category</span><span>Preferred Session</span><span>Strategies</span><span>Workspace Enabled</span><span>Monitoring Enabled</span><span>Edit</span><span>Remove</span></div>
+          <div className="instrument-table-head"><span>Symbol</span><span>Name</span><span>Category</span><span>Monitored Sessions</span><span>Strategies</span><span>Workspace Enabled</span><span>Monitoring Enabled</span><span>Edit</span><span>Remove</span></div>
           {store.instruments.sort((left, right) => left.config.symbol.localeCompare(right.config.symbol)).map((instrument) => {
             const strategies = Object.entries(instrument.config.strategies).filter(([, enabled]) => enabled).map(([name]) => name === 'dailyPlan' ? 'Daily Plan' : name[0].toUpperCase() + name.slice(1))
             return <div className={`instrument-table-row ${instrument.config.enabled ? '' : 'disabled'}`} key={instrument.config.symbol}>
               <strong>{instrument.config.symbol}</strong>
               <span>{instrument.config.displayName}{!instrument.config.enabled && <StatusBadge>Disabled</StatusBadge>}</span>
               <span>{instrument.config.category}</span>
-              <span>{sessionLabel(instrument.config.preferredSession)}</span>
+              <span>{sessionsLabel(instrument.config.monitoredSessions)}</span>
               <span className="instrument-strategy-list">{strategies.length ? strategies.join(' · ') : 'None'}</span>
               <Toggle checked={instrument.config.workspaceEnabled} onChange={(workspaceEnabled) => store.updateInstrument(instrument.config.symbol, { workspaceEnabled })} label={`${instrument.config.symbol} workspace`} />
               <Toggle checked={instrument.monitoring} onChange={(enabled) => store.setInstrumentMonitoring(instrument.config.symbol, enabled)} label={`${instrument.config.symbol} monitoring`} />

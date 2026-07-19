@@ -49,6 +49,23 @@ describe('instrument store migration', () => {
     expect(second.instruments.XAUUSD.price).toBe(4100)
   })
 
+  it('migrates the old single preferred session and enables all sessions for Gold', () => {
+    const first = createInitialInstrumentStore(storage({}))
+    const legacyGold = structuredClone(first.instruments.XAUUSD) as typeof first.instruments.XAUUSD & {
+      config: typeof first.instruments.XAUUSD.config & { preferredSession?: string }
+    }
+    delete (legacyGold.config as Partial<typeof legacyGold.config>).monitoredSessions
+    delete (legacyGold.config as Partial<typeof legacyGold.config>).strategySessions
+    legacyGold.config.preferredSession = 'london'
+
+    const migrated = createInitialInstrumentStore(storage({
+      [INSTRUMENT_STORE_KEY]: JSON.stringify({ version: 1, instruments: { XAUUSD: legacyGold } }),
+    }))
+
+    expect(migrated.instruments.XAUUSD.config.monitoredSessions).toEqual(['tokyo', 'london', 'newYork'])
+    expect(migrated.instruments.XAUUSD.config.strategySessions.orb).toEqual(['london'])
+  })
+
   it('recovers from malformed storage and still creates the clean default registry', () => {
     const store = createInitialInstrumentStore(storage({
       [INSTRUMENT_STORE_KEY]: '{bad json',

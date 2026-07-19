@@ -18,7 +18,11 @@ const defaultPrices: Record<string, { price: number; dailyChange: number }> = {
   NAS100: { price: 21842.6, dailyChange: 0.46 },
 }
 
-const sessionName = (session: InstrumentConfiguration['preferredSession']) =>
+const sessionIds = ['tokyo', 'london', 'newYork'] as const
+const validSessions = (value: unknown) => Array.isArray(value)
+  ? value.filter((session): session is typeof sessionIds[number] => sessionIds.includes(session as typeof sessionIds[number]))
+  : []
+const sessionName = (session: InstrumentConfiguration['monitoredSessions'][number]) =>
   session === 'newYork' ? 'New York' : session[0].toUpperCase() + session.slice(1)
 
 export function createDefaultInstrumentState(config: InstrumentConfiguration): InstrumentWorkspaceState {
@@ -26,6 +30,8 @@ export function createDefaultInstrumentState(config: InstrumentConfiguration): I
   const price = quote.price
   const approach = config.defaultApproachDistance
   const tolerance = config.defaultEntryTolerance
+  const orbSession = config.strategySessions.orb[0] ?? config.monitoredSessions[0] ?? 'london'
+  const manipulationSession = config.strategySessions.manipulation[0] ?? config.monitoredSessions[0] ?? 'london'
   const plan = config.symbol === 'XAUUSD'
     ? structuredClone(defaultPlan)
     : { bias: 'Neutral' as const, levels: [], approachDistance: approach, entryTolerance: tolerance, lastSaved: null }
@@ -33,7 +39,7 @@ export function createDefaultInstrumentState(config: InstrumentConfiguration): I
     ? structuredClone(defaultOrb)
     : {
       ...structuredClone(defaultOrb),
-      session: sessionName(config.preferredSession),
+      session: sessionName(orbSession),
       high: price + approach,
       low: price - approach,
       dailyAtr: Math.max(approach * 10, config.pointSize),
@@ -46,7 +52,7 @@ export function createDefaultInstrumentState(config: InstrumentConfiguration): I
     ? structuredClone(defaultManipulation)
     : {
       ...structuredClone(defaultManipulation),
-      session: sessionName(config.preferredSession),
+      session: sessionName(manipulationSession),
       firstCandleHigh: price + approach,
       firstCandleLow: price - approach,
       dailyAtr: Math.max(approach * 10, config.pointSize),
@@ -85,11 +91,17 @@ export function createDefaultInstrumentState(config: InstrumentConfiguration): I
 
 function normalizeConfiguration(raw: unknown, fallback: InstrumentConfiguration): InstrumentConfiguration {
   if (!raw || typeof raw !== 'object') return fallback
-  const value = raw as Partial<InstrumentConfiguration>
+  const value = raw as Partial<InstrumentConfiguration> & { preferredSession?: unknown }
   const number = (candidate: unknown, fallbackValue: number, allowZero = false) =>
     Number.isFinite(Number(candidate)) && (allowZero ? Number(candidate) >= 0 : Number(candidate) > 0)
       ? Number(candidate)
       : fallbackValue
+  const monitoredSessions = validSessions(value.monitoredSessions)
+  const legacySession = sessionIds.includes(value.preferredSession as typeof sessionIds[number])
+    ? value.preferredSession as typeof sessionIds[number]
+    : undefined
+  const orbSessions = validSessions(value.strategySessions?.orb)
+  const manipulationSessions = validSessions(value.strategySessions?.manipulation)
   return {
     ...fallback,
     ...value,
@@ -102,9 +114,15 @@ function normalizeConfiguration(raw: unknown, fallback: InstrumentConfiguration)
       : fallback.category,
     enabled: typeof value.enabled === 'boolean' ? value.enabled : fallback.enabled,
     workspaceEnabled: typeof value.workspaceEnabled === 'boolean' ? value.workspaceEnabled : fallback.workspaceEnabled,
-    preferredSession: value.preferredSession === 'tokyo' || value.preferredSession === 'london' || value.preferredSession === 'newYork'
-      ? value.preferredSession
-      : fallback.preferredSession,
+    monitoredSessions: monitoredSessions.length
+      ? monitoredSessions
+      : fallback.symbol === 'XAUUSD'
+        ? fallback.monitoredSessions
+        : legacySession ? [legacySession] : fallback.monitoredSessions,
+    strategySessions: {
+      orb: orbSessions.length ? orbSessions : fallback.strategySessions.orb,
+      manipulation: manipulationSessions.length ? manipulationSessions : fallback.strategySessions.manipulation,
+    },
     priceDecimals: Number.isInteger(value.priceDecimals) && Number(value.priceDecimals) >= 0 && Number(value.priceDecimals) <= 8
       ? Number(value.priceDecimals)
       : fallback.priceDecimals,

@@ -12,6 +12,7 @@ import { StatusBadge } from './Chrome'
 import { SessionStatusCard } from './SessionComponents'
 import { useSession } from '../hooks/useSession'
 import { formatSessionDuration } from '../services/sessionEngine'
+import { hasActiveMonitoredSession, selectMonitoredSession } from '../utils/instrumentSessions'
 import { DailyPlanImportModal } from './DailyPlanImportModal'
 import type { ParsedDailyPlan, PlanImportMode } from '../types/dailyPlanImport'
 import { buildImportedDailyPlan } from '../utils/dailyPlanImport'
@@ -19,7 +20,8 @@ import { buildImportedDailyPlan } from '../utils/dailyPlanImport'
 export function InstrumentOperationalSubtitle() {
   const gold = useInstrumentWorkspace()
   const session = useSession()
-  const marketSession = session.sessions[gold.config.preferredSession]
+  const marketSession = selectMonitoredSession(gold.config, session.sessions)
+  const sessionActive = hasActiveMonitoredSession(gold.config, session.sessions)
   const nearest = calculateNearestLevel(gold.price, gold.plan.levels)
   const levelStatus = nearest ? calculateLevelStatus(gold.price, nearest) : 'DISABLED'
   const sessionLabel = `${marketSession.name} ${marketSession.state === 'OPEN' ? 'open' : marketSession.state === 'CLOSING_SOON' ? 'closing soon' : marketSession.state === 'OPENING_SOON' ? 'opens soon' : 'closed'}`
@@ -30,7 +32,7 @@ export function InstrumentOperationalSubtitle() {
   if (levelStatus === 'APPROACHING' || levelStatus === 'ALERT SENT' || levelStatus === 'IN ZONE') {
     return <p>Price approaching {nearest?.direction.toLowerCase()} level • {levelStatus === 'IN ZONE' ? 'Watch M1' : 'Prepare M1'}</p>
   }
-  if (marketSession.isActive && !gold.orb.rangeComplete) {
+  if (sessionActive && !gold.orb.rangeComplete) {
     return <p>{sessionLabel} • ORB building • M15 closes in {String(session.candles.M15.minutes).padStart(2, '0')}:{String(session.candles.M15.seconds).padStart(2, '0')}</p>
   }
   return <p>{sessionLabel} • {nearest ? `Monitoring ${nearest.direction} ${formatPrice(nearest.price, gold.config.priceDecimals)} • ${formatPrice(Math.abs(nearest.price - gold.price), gold.config.priceDecimals)} away` : 'No active daily-plan level'}</p>
@@ -39,10 +41,11 @@ export function InstrumentOperationalSubtitle() {
 export function InstrumentOverview({ onTab }: { onTab: (tab: InstrumentTab) => void }) {
   const gold = useInstrumentWorkspace()
   const session = useSession()
-  const marketSession = session.sessions[gold.config.preferredSession]
+  const marketSession = selectMonitoredSession(gold.config, session.sessions)
+  const sessionActive = hasActiveMonitoredSession(gold.config, session.sessions)
   const nearest = calculateNearestLevel(gold.price, gold.plan.levels)
-  const status = calculateInstrumentStatus(gold.monitoring, marketSession.isActive, nearest, gold.price)
-  const next = calculateNextAction(gold.monitoring, marketSession.isActive, nearest, gold.price, gold.orb, gold.manipulation)
+  const status = calculateInstrumentStatus(gold.monitoring, sessionActive, nearest, gold.price)
+  const next = calculateNextAction(gold.monitoring, sessionActive, nearest, gold.price, gold.orb, gold.manipulation)
   const distance = nearest ? Math.abs(nearest.price - gold.price) : null
   const orbDistance = Math.min(Math.abs(gold.price - gold.orb.high), Math.abs(gold.price - gold.orb.low))
   const manipulation = calculateManipulationClassification(gold.manipulation)
@@ -56,7 +59,7 @@ export function InstrumentOverview({ onTab }: { onTab: (tab: InstrumentTab) => v
   const conditions = [
     ['Monitoring Enabled', gold.monitoring, gold.monitoring ? 'On' : 'Off'],
     ['Daily Plan Loaded', gold.plan.levels.length > 0, `${gold.plan.levels.length} levels`],
-    ['Session Active', marketSession.isActive, `${marketSession.name} ${marketSession.state.replace('_', ' ').toLowerCase()}`],
+    ['Session Active', sessionActive, `${marketSession.name} ${marketSession.state.replace('_', ' ').toLowerCase()}`],
     ['Opening Range Complete', gold.orb.rangeComplete, gold.orb.rangeComplete ? 'Complete' : 'Building'],
     ['Manipulation Confirmed', gold.manipulation.reclaimed, gold.manipulation.reclaimed ? 'Reclaim confirmed' : manipulation.classification],
     ['Breakout Detected', Boolean(gold.orb.breakoutDirection), gold.orb.breakoutDirection ?? 'None'],
@@ -111,7 +114,7 @@ export function InstrumentOverview({ onTab }: { onTab: (tab: InstrumentTab) => v
         </div>
       </Card>
 
-      <SessionStatusCard sessionId={gold.config.preferredSession} />
+      <SessionStatusCard sessionId={marketSession.id} />
     </div>
   )
 }

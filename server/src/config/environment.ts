@@ -20,6 +20,8 @@ export const environment = {
   port,
   clientUrl: process.env.CLIENT_URL ?? 'http://localhost:3001',
   cTraderClientId: process.env.CTRADER_CLIENT_ID ?? '',
+  cTraderRedirectUri: process.env.CTRADER_REDIRECT_URI ?? '',
+  cTraderEnvironment: process.env.CTRADER_ENVIRONMENT ?? '',
   cTraderClientSecret: process.env.CTRADER_CLIENT_SECRET ?? '',
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID ?? '',

@@ -3,6 +3,7 @@ import { useInstrumentStore } from '../context/InstrumentContext'
 import type { InstrumentPriorityInput, PrioritySignal } from '../types/instrumentPriority'
 import { calculateLevelStatus, calculateManipulationClassification, calculateNearestLevel } from '../utils/trading'
 import { sortInstrumentQueue, toAlertReadyInstrumentState } from '../utils/instrumentPriority'
+import { selectMonitoredSession } from '../utils/instrumentSessions'
 import { useSession } from './useSession'
 
 export function useInstrumentQueue() {
@@ -14,7 +15,7 @@ export function useInstrumentQueue() {
       .filter((instrument) => instrument.config.enabled)
       .map((instrument) => {
         const { config } = instrument
-        const tradingSession = sessionEngine.sessions[config.preferredSession]
+        const tradingSession = selectMonitoredSession(config, sessionEngine.sessions)
         const nearest = calculateNearestLevel(instrument.price, instrument.plan.levels)
         const levelStatus = nearest ? calculateLevelStatus(instrument.price, nearest) : 'DISABLED'
         const manipulation = calculateManipulationClassification(instrument.manipulation)
@@ -42,7 +43,7 @@ export function useInstrumentQueue() {
             symbol: config.symbol,
             name: config.displayName,
             precision: config.priceDecimals,
-            primarySessionId: config.preferredSession,
+            primarySessionId: tradingSession.id,
             strategies: strategies.map((strategy) => strategy.name),
             workspace: config.workspaceEnabled ? config.symbol : null,
           },

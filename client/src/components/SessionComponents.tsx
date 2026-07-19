@@ -58,24 +58,24 @@ export function SessionBar({ instrument, context }: { instrument: InstrumentWork
 
 export function SessionStatusCard({ sessionId = 'london' }: { sessionId?: SessionId }) {
   const session = useSession()
-  const preferredSession = session.sessions[sessionId]
+  const currentSession = session.sessions[sessionId]
   const next = session.nextSession.session
 
   return (
     <section className="card session-status-card">
       <div className="card-head">
         <div><span>Live session engine</span><h2>Session Status</h2></div>
-        <span className={`badge badge--${preferredSession.classification === 'open' ? 'positive' : preferredSession.classification === 'closing' ? 'danger' : preferredSession.classification === 'opening' ? 'warning' : 'neutral'}`}>
-          {stateLabel(preferredSession.state)}
+        <span className={`badge badge--${currentSession.classification === 'open' ? 'positive' : currentSession.classification === 'closing' ? 'danger' : currentSession.classification === 'opening' ? 'warning' : 'neutral'}`}>
+          {stateLabel(currentSession.state)}
         </span>
       </div>
       <div className="session-status-main">
-        <div><span>Current trading session</span><strong>{preferredSession.name}</strong></div>
-        <div><span>Time remaining</span><strong>{formatSessionDuration(preferredSession.timeRemaining)}</strong></div>
+        <div><span>Current trading session</span><strong>{currentSession.name}</strong></div>
+        <div><span>Time remaining</span><strong>{formatSessionDuration(currentSession.timeRemaining)}</strong></div>
       </div>
       <div className="session-progress">
-        <div><span>Progress</span><strong>{preferredSession.progressPercentage.toFixed(0)}%</strong></div>
-        <div className="session-progress-track"><i style={{ width: `${preferredSession.progressPercentage}%` }} /></div>
+        <div><span>Progress</span><strong>{currentSession.progressPercentage.toFixed(0)}%</strong></div>
+        <div className="session-progress-track"><i style={{ width: `${currentSession.progressPercentage}%` }} /></div>
       </div>
       <div className="session-status-grid">
         <div><span>Next session</span><strong>{next ? `${next.name} in ${formatSessionDuration(session.nextSession.countdown)}` : '—'}</strong></div>
