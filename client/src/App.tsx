@@ -8,6 +8,8 @@ import { AdminPage, AlertsPage, InstrumentPage, OverviewPage } from './pages/Das
 import { createDefaultInstrumentState } from './services/instrumentStore'
 import type { AppSettings, InstrumentTab, View } from './types'
 
+const marketSimulatorEnabled = import.meta.env.VITE_ENABLE_MARKET_SIMULATOR === 'true'
+
 function initialRoute(): { view: View; symbol?: string } {
   const instrumentMatch = window.location.pathname.match(/^\/instruments\/([^/]+)$/i)
   if (instrumentMatch) return { view: 'instrument', symbol: decodeURIComponent(instrumentMatch[1]).toUpperCase() }
@@ -70,7 +72,14 @@ function App() {
         {view === 'alerts' && <AlertsPage />}
         {view === 'admin' && <AdminPage settings={settings} onSettings={setSettings} />}
       </div>
-      <MockPriceController price={instrument.price} config={instrument.config} resetPrice={createDefaultInstrumentState(instrument.config).price} onChange={instrumentStore.actions.setPrice} />
+      {marketSimulatorEnabled && (
+        <MockPriceController
+          price={instrument.price}
+          config={instrument.config}
+          resetPrice={createDefaultInstrumentState(instrument.config).price}
+          onChange={instrumentStore.actions.setPrice}
+        />
+      )}
     </div>
   )
 }

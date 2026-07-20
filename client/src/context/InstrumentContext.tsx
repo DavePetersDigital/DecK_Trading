@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type {
   ActivityCategory, ActivityEvent, Alert, DailyPlan, InstrumentConfiguration,
-  InstrumentStoreState, InstrumentWorkspaceState, ManipulationData, OrbData,
+  InstrumentDataSource, InstrumentStoreState, InstrumentWorkspaceState, ManipulationData, OrbData,
   PlannedLevel, StructureData, StructureZone,
 } from '../types'
 import {
@@ -48,6 +48,8 @@ interface InstrumentContextValue {
   addInstrument: (config: InstrumentConfiguration) => boolean
   updateInstrument: (symbol: string, patch: Partial<InstrumentConfiguration>) => void
   setInstrumentMonitoring: (symbol: string, enabled: boolean) => void
+  applyReferencePrice: (symbol: string, price: number, dataSourceStatus: InstrumentDataSource) => void
+  setInstrumentDataSource: (symbol: string, dataSourceStatus: InstrumentDataSource) => void
   removeInstrument: (symbol: string) => boolean
   replaceStore: (store: InstrumentStoreState) => void
   actions: InstrumentWorkspaceActions
@@ -276,6 +278,38 @@ export function InstrumentProvider({ children }: { children: React.ReactNode }) 
             },
           },
           adminHistory: [activity('SYSTEM', `${symbol} monitoring ${monitoring ? 'enabled' : 'disabled'}`, null, monitoring ? 'On' : 'Off'), ...old.adminHistory],
+        }
+      }),
+      applyReferencePrice: (symbol, price, dataSourceStatus) => setStore((old) => {
+        const state = old.instruments[symbol]
+        if (!state) return old
+        if (state.price === price && state.dataSourceStatus === dataSourceStatus) return old
+        return {
+          ...old,
+          instruments: {
+            ...old.instruments,
+            [symbol]: {
+              ...state,
+              price,
+              dataSourceStatus,
+              lastStatusUpdate: new Date().toISOString(),
+            },
+          },
+        }
+      }),
+      setInstrumentDataSource: (symbol, dataSourceStatus) => setStore((old) => {
+        const state = old.instruments[symbol]
+        if (!state || state.dataSourceStatus === dataSourceStatus) return old
+        return {
+          ...old,
+          instruments: {
+            ...old.instruments,
+            [symbol]: {
+              ...state,
+              dataSourceStatus,
+              lastStatusUpdate: new Date().toISOString(),
+            },
+          },
         }
       }),
       removeInstrument: (symbol) => {

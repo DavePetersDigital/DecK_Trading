@@ -51,7 +51,7 @@ export type InstrumentStatus =
   | 'SESSION CLOSED' | 'MONITORING OFF'
 export type StrategyStatus =
   | 'NO ACTIVE SETUP' | 'WAITING' | 'MONITORING' | 'APPROACHING'
-  | 'WATCH M1' | 'ACTION REQUIRED' | 'SESSION CLOSED' | 'MONITORING OFF'
+  | 'WATCH M5' | 'ACTION REQUIRED' | 'SESSION CLOSED' | 'MONITORING OFF'
 export type LevelStatus = 'DISABLED' | 'WAITING' | 'APPROACHING' | 'IN ZONE' | 'PASSED' | 'ALERT SENT'
 export type OrbState =
   | 'Waiting for session' | 'Building opening candle' | 'Opening range complete'

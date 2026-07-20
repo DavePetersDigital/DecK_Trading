@@ -1,4 +1,5 @@
 import { useSession } from '../hooks/useSession'
+import { useCTraderMarketSnapshot } from '../context/CTraderMarketContext'
 import { formatCandleDuration, formatSessionDuration } from '../services/sessionEngine'
 import type { InstrumentWorkspaceState } from '../types'
 import type { SessionId, SessionState, TradingSession } from '../types/session'
@@ -12,6 +13,39 @@ function sessionCountdownLabel(session: TradingSession) {
     : `Opens in ${formatSessionDuration(session.countdownToOpen)}`
 }
 
+function MarketSourceLabel({ instrument }: { instrument: InstrumentWorkspaceState }) {
+  const market = useCTraderMarketSnapshot()
+  if (instrument.config.symbol === 'XAUUSD') {
+    const tone = market.sourceLabel.includes('ERROR') || market.sourceLabel.includes('DISCONNECTED')
+      ? 'red'
+      : market.sourceLabel.includes('STALE') || market.sourceLabel.includes('FALLBACK') || market.sourceLabel.includes('CONNECTING')
+        ? 'amber'
+        : ''
+    return (
+      <div className="live-status">
+        <i className={`status-dot ${tone}`} />
+        {market.sourceLabel}
+      </div>
+    )
+  }
+
+  return (
+    <div className="live-status">
+      <i className={`status-dot ${instrument.dataSourceStatus === 'Disconnected' ? 'red' : ''}`} />
+      {instrument.dataSourceStatus === 'Mock' ? 'MOCK DATA' : instrument.dataSourceStatus.toUpperCase()}
+    </div>
+  )
+}
+
+function HeaderPrice({ instrument }: { instrument: InstrumentWorkspaceState }) {
+  const market = useCTraderMarketSnapshot()
+  if (instrument.config.symbol !== 'XAUUSD') {
+    return <>{formatPrice(instrument.price, instrument.config.priceDecimals)}</>
+  }
+  if (market.price == null) return <>——</>
+  return <>{formatPrice(market.price, instrument.config.priceDecimals)}</>
+}
+
 export function SessionBar({ instrument, context }: { instrument: InstrumentWorkspaceState; context: 'instrument' | 'overview' | 'dashboard' }) {
   const session = useSession()
   const isInstrument = context === 'instrument'
@@ -23,7 +57,7 @@ export function SessionBar({ instrument, context }: { instrument: InstrumentWork
           {isInstrument && <div className="symbol-icon">{instrument.config.iconText ?? instrument.config.symbol.slice(0, 2)}</div>}
           <div>
             <span>{isInstrument ? `${instrument.config.symbol} · ${instrument.config.shortName.toUpperCase()}` : 'DECK TRADING DASHBOARD'}</span>
-            <strong>{isInstrument ? formatPrice(instrument.price, instrument.config.priceDecimals) : context === 'overview' ? 'Market Overview' : 'Operations'}</strong>
+            <strong>{isInstrument ? <HeaderPrice instrument={instrument} /> : context === 'overview' ? 'Market Overview' : 'Operations'}</strong>
           </div>
         </div>
         <div className="session-clocks">
@@ -38,7 +72,7 @@ export function SessionBar({ instrument, context }: { instrument: InstrumentWork
             </span>
           ))}
         </div>
-        <div className="live-status"><i className={`status-dot ${instrument.dataSourceStatus === 'Disconnected' ? 'red' : ''}`} />{instrument.dataSourceStatus === 'Mock' ? 'MOCK DATA' : instrument.dataSourceStatus.toUpperCase()}</div>
+        <MarketSourceLabel instrument={instrument} />
       </div>
       <div className="session-blocks">
         {Object.values(session.sessions).map((item) => (

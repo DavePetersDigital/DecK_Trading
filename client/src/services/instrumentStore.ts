@@ -77,7 +77,7 @@ export function createDefaultInstrumentState(config: InstrumentConfiguration): I
     config,
     price,
     dailyChange: quote.dailyChange,
-    dataSourceStatus: 'Mock',
+    dataSourceStatus: config.symbol === 'XAUUSD' ? 'Disconnected' : 'Mock',
     plan,
     monitoring: true,
     orb,
@@ -149,7 +149,11 @@ export function migrateInstrumentState(
     config: normalizeConfiguration(value.config, config),
     price: Number.isFinite(Number(value.price)) ? Number(value.price) : fallback.price,
     dailyChange: Number.isFinite(Number(value.dailyChange)) ? Number(value.dailyChange) : fallback.dailyChange,
-    dataSourceStatus: value.dataSourceStatus === 'Live' || value.dataSourceStatus === 'Disconnected' ? value.dataSourceStatus : 'Mock',
+    dataSourceStatus: value.dataSourceStatus === 'Live' || value.dataSourceStatus === 'Disconnected'
+      ? value.dataSourceStatus
+      : config.symbol === 'XAUUSD'
+        ? 'Disconnected'
+        : 'Mock',
     plan: value.plan && typeof value.plan === 'object' ? migratePlan(value.plan) : fallback.plan,
     orb: { ...fallback.orb, ...(value.orb && typeof value.orb === 'object' ? value.orb : {}) },
     manipulation: { ...fallback.manipulation, ...(value.manipulation && typeof value.manipulation === 'object' ? value.manipulation : {}) },

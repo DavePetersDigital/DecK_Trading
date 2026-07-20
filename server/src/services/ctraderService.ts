@@ -1,4 +1,5 @@
 import { environment } from '../config/environment.js'
+import { restartCTraderSpotStream } from './ctraderSpotStreamService.js'
 
 const CTRADER_AUTHORIZATION_URL = 'https://id.ctrader.com/my/settings/openapi/grantingaccess/'
 const CTRADER_TOKEN_URL = 'https://openapi.ctrader.com/apps/token'
@@ -76,6 +77,7 @@ export async function exchangeCTraderAuthorizationCode(code: string) {
   }
 
   accessToken = payload.accessToken
+  restartCTraderSpotStream()
 }
 
 export function getCTraderAccessToken() {

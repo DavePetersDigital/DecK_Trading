@@ -7,7 +7,7 @@ import { formatCandleDuration, formatSessionDuration } from '../services/session
 
 const baseScores: Record<PrioritySignal, number> = {
   ACTION_REQUIRED: 100,
-  WATCH_M1: 95,
+  WATCH_M5: 95,
   IN_ENTRY_ZONE: 90,
   APPROACHING: 75,
   BREAKOUT_DETECTED: 70,
@@ -29,7 +29,7 @@ export const priorityGroupOrder: InstrumentStatus[] = [
 ]
 
 function statusForSignal(signal: PrioritySignal): InstrumentStatus {
-  if (signal === 'ACTION_REQUIRED' || signal === 'WATCH_M1' || signal === 'IN_ENTRY_ZONE') return 'ACTION REQUIRED'
+  if (signal === 'ACTION_REQUIRED' || signal === 'WATCH_M5' || signal === 'IN_ENTRY_ZONE') return 'ACTION REQUIRED'
   if (signal === 'APPROACHING') return 'APPROACHING'
   if (signal === 'BREAKOUT_DETECTED' || signal === 'RECLAIM_CONFIRMED' || signal === 'WATCH') return 'WATCH'
   if (signal === 'MONITORING_OFF') return 'MONITORING OFF'
@@ -57,10 +57,10 @@ function operationalMessage(input: InstrumentPriorityInput): Pick<InstrumentPrio
       nextAction: `SESSION CLOSED — Continue monitoring until ${input.session.name} opens.`,
     }
   }
-  if (input.signal === 'ACTION_REQUIRED' || input.signal === 'WATCH_M1' || input.signal === 'IN_ENTRY_ZONE') {
+  if (input.signal === 'ACTION_REQUIRED' || input.signal === 'WATCH_M5' || input.signal === 'IN_ENTRY_ZONE') {
     return {
       reason: `Price is inside ${trigger}${distance}.`,
-      nextAction: `WATCH M1 — Look for ${input.triggerDirection === 'Sell' ? 'bearish' : 'bullish'} confirmation.`,
+      nextAction: `WATCH M5 — Look for ${input.triggerDirection === 'Sell' ? 'bearish' : 'bullish'} confirmation.`,
     }
   }
   if (input.signal === 'APPROACHING') {

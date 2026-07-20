@@ -23,7 +23,7 @@ export function useInstrumentQueue() {
         let signal: PrioritySignal = 'WAITING'
 
         if (!instrument.monitoring) signal = 'MONITORING_OFF'
-        else if (levelStatus === 'IN ZONE' || levelStatus === 'PASSED') signal = 'WATCH_M1'
+        else if (levelStatus === 'IN ZONE' || levelStatus === 'PASSED') signal = 'WATCH_M5'
         else if (levelStatus === 'APPROACHING' || levelStatus === 'ALERT SENT') signal = 'APPROACHING'
         else if (config.strategies.manipulation && instrument.manipulation.reclaimed) signal = 'RECLAIM_CONFIRMED'
         else if (config.strategies.orb && instrument.orb.breakoutDirection) signal = 'BREAKOUT_DETECTED'
@@ -65,8 +65,8 @@ export function useInstrumentQueue() {
           manipulationDetected: manipulation.percentage >= 20,
           reclaimConfirmed: instrument.manipulation.reclaimed,
           alertAlreadySent: nearest?.alertSent ?? false,
-          relevantCandle: 'M1',
-          candle: sessionEngine.candles.M1,
+          relevantCandle: 'M5',
+          candle: sessionEngine.candles.M5,
           timestamp: sessionEngine.now.toISOString(),
         }
       })

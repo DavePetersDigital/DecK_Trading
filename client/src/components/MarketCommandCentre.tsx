@@ -41,8 +41,8 @@ function shortSessionLabel(instrument: AlertReadyInstrumentState) {
 
 function shortNextAction(instrument: AlertReadyInstrumentState) {
   const direction = instrument.triggerDirection === 'Sell' ? 'bearish' : 'bullish'
-  if (['ACTION_REQUIRED', 'WATCH_M1', 'IN_ENTRY_ZONE'].includes(instrument.signal)) {
-    return `Watch M1 for ${direction} confirmation`
+  if (['ACTION_REQUIRED', 'WATCH_M5', 'IN_ENTRY_ZONE'].includes(instrument.signal)) {
+    return `Watch M5 for ${direction} confirmation`
   }
   if (instrument.signal === 'APPROACHING') return `Prepare to open ${instrument.relevantCandle.timeframe}`
   if (instrument.signal === 'BREAKOUT_DETECTED') return 'Waiting for breakout confirmation'

@@ -3,7 +3,7 @@ import type { CandleCountdown, CandleTimeframe, SessionId, TradingSession } from
 
 export type PrioritySignal =
   | 'ACTION_REQUIRED'
-  | 'WATCH_M1'
+  | 'WATCH_M5'
   | 'IN_ENTRY_ZONE'
   | 'APPROACHING'
   | 'BREAKOUT_DETECTED'

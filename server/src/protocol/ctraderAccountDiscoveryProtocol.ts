@@ -250,6 +250,63 @@ const schema = `
     optional int64 symbolId = 6;
     optional bool hasMore = 7;
   }
+
+  message ProtoOASymbol {
+    required int64 symbolId = 1;
+    required int32 digits = 2;
+    required int32 pipPosition = 3;
+  }
+
+  message ProtoOASymbolByIdReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOL_BY_ID_REQ];
+    required int64 ctidTraderAccountId = 2;
+    repeated int64 symbolId = 3;
+  }
+
+  message ProtoOASymbolByIdRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOL_BY_ID_RES];
+    required int64 ctidTraderAccountId = 2;
+    repeated ProtoOASymbol symbol = 3;
+    repeated ProtoOAArchivedSymbol archivedSymbol = 4;
+  }
+
+  message ProtoOASubscribeSpotsReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SUBSCRIBE_SPOTS_REQ];
+    required int64 ctidTraderAccountId = 2;
+    repeated int64 symbolId = 3;
+    optional bool subscribeToSpotTimestamp = 4;
+  }
+
+  message ProtoOASubscribeSpotsRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SUBSCRIBE_SPOTS_RES];
+    required int64 ctidTraderAccountId = 2;
+  }
+
+  message ProtoOAUnsubscribeSpotsReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_UNSUBSCRIBE_SPOTS_REQ];
+    required int64 ctidTraderAccountId = 2;
+    repeated int64 symbolId = 3;
+  }
+
+  message ProtoOAUnsubscribeSpotsRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_UNSUBSCRIBE_SPOTS_RES];
+    required int64 ctidTraderAccountId = 2;
+  }
+
+  message ProtoOASpotEvent {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SPOT_EVENT];
+    required int64 ctidTraderAccountId = 2;
+    required int64 symbolId = 3;
+    optional uint64 bid = 4;
+    optional uint64 ask = 5;
+    repeated ProtoOATrendbar trendbar = 6;
+    optional uint64 sessionClose = 7;
+    optional int64 timestamp = 8;
+  }
+
+  message ProtoHeartbeatEvent {
+    optional ProtoPayloadType payloadType = 1 [default = HEARTBEAT_EVENT];
+  }
 `
 
 const root = protobuf.parse(schema).root
@@ -257,6 +314,7 @@ const root = protobuf.parse(schema).root
 export const cTraderProtocol = {
   message: root.lookupType('ProtoMessage'),
   commonError: root.lookupType('ProtoErrorRes'),
+  heartbeat: root.lookupType('ProtoHeartbeatEvent'),
   applicationAuthRequest: root.lookupType('ProtoOAApplicationAuthReq'),
   applicationAuthResponse: root.lookupType('ProtoOAApplicationAuthRes'),
   accountAuthRequest: root.lookupType('ProtoOAAccountAuthReq'),
@@ -266,6 +324,13 @@ export const cTraderProtocol = {
   accountListResponse: root.lookupType('ProtoOAGetAccountListByAccessTokenRes'),
   symbolsListRequest: root.lookupType('ProtoOASymbolsListReq'),
   symbolsListResponse: root.lookupType('ProtoOASymbolsListRes'),
+  symbolByIdRequest: root.lookupType('ProtoOASymbolByIdReq'),
+  symbolByIdResponse: root.lookupType('ProtoOASymbolByIdRes'),
+  subscribeSpotsRequest: root.lookupType('ProtoOASubscribeSpotsReq'),
+  subscribeSpotsResponse: root.lookupType('ProtoOASubscribeSpotsRes'),
+  unsubscribeSpotsRequest: root.lookupType('ProtoOAUnsubscribeSpotsReq'),
+  unsubscribeSpotsResponse: root.lookupType('ProtoOAUnsubscribeSpotsRes'),
+  spotEvent: root.lookupType('ProtoOASpotEvent'),
   getTrendbarsRequest: root.lookupType('ProtoOAGetTrendbarsReq'),
   getTrendbarsResponse: root.lookupType('ProtoOAGetTrendbarsRes'),
 } as const
@@ -279,6 +344,13 @@ export const cTraderPayloadType = {
   accountAuthResponse: 2103,
   symbolsListRequest: 2114,
   symbolsListResponse: 2115,
+  symbolByIdRequest: 2116,
+  symbolByIdResponse: 2117,
+  subscribeSpotsRequest: 2127,
+  subscribeSpotsResponse: 2128,
+  unsubscribeSpotsRequest: 2129,
+  unsubscribeSpotsResponse: 2130,
+  spotEvent: 2131,
   getTrendbarsRequest: 2137,
   getTrendbarsResponse: 2138,
   openApiError: 2142,

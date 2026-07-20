@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useCTraderMarketSnapshot } from '../context/CTraderMarketContext'
 import { useInstrumentWorkspace } from '../context/InstrumentContext'
 import type { ActivityCategory, Bias, InstrumentTab, PlannedLevel } from '../types'
 import {
@@ -27,10 +28,10 @@ export function InstrumentOperationalSubtitle() {
   const sessionLabel = `${marketSession.name} ${marketSession.state === 'OPEN' ? 'open' : marketSession.state === 'CLOSING_SOON' ? 'closing soon' : marketSession.state === 'OPENING_SOON' ? 'opens soon' : 'closed'}`
 
   if (!gold.monitoring) return <p>Monitoring off • Enable monitoring to resume trading alerts</p>
-  if (gold.manipulation.reclaimed) return <p>Manipulation reclaim confirmed • Watch M1 for entry confirmation</p>
+  if (gold.manipulation.reclaimed) return <p>Manipulation reclaim confirmed • Watch M5 for entry confirmation</p>
   if (gold.orb.breakoutDirection) return <p>Waiting for breakout confirmation • Watch the next candle close</p>
   if (levelStatus === 'APPROACHING' || levelStatus === 'ALERT SENT' || levelStatus === 'IN ZONE') {
-    return <p>Price approaching {nearest?.direction.toLowerCase()} level • {levelStatus === 'IN ZONE' ? 'Watch M1' : 'Prepare M1'}</p>
+    return <p>Price approaching {nearest?.direction.toLowerCase()} level • {levelStatus === 'IN ZONE' ? 'Watch M5' : 'Prepare M5'}</p>
   }
   if (sessionActive && !gold.orb.rangeComplete) {
     return <p>{sessionLabel} • ORB building • M15 closes in {String(session.candles.M15.minutes).padStart(2, '0')}:{String(session.candles.M15.seconds).padStart(2, '0')}</p>
@@ -40,20 +41,22 @@ export function InstrumentOperationalSubtitle() {
 
 export function InstrumentOverview({ onTab }: { onTab: (tab: InstrumentTab) => void }) {
   const gold = useInstrumentWorkspace()
+  const market = useCTraderMarketSnapshot()
   const session = useSession()
   const marketSession = selectMonitoredSession(gold.config, session.sessions)
   const sessionActive = hasActiveMonitoredSession(gold.config, session.sessions)
-  const nearest = calculateNearestLevel(gold.price, gold.plan.levels)
-  const status = calculateInstrumentStatus(gold.monitoring, sessionActive, nearest, gold.price)
-  const next = calculateNextAction(gold.monitoring, sessionActive, nearest, gold.price, gold.orb, gold.manipulation)
-  const distance = nearest ? Math.abs(nearest.price - gold.price) : null
-  const orbDistance = Math.min(Math.abs(gold.price - gold.orb.high), Math.abs(gold.price - gold.orb.low))
+  const displayPrice = gold.config.symbol === 'XAUUSD' && market.price != null ? market.price : gold.price
+  const nearest = calculateNearestLevel(displayPrice, gold.plan.levels)
+  const status = calculateInstrumentStatus(gold.monitoring, sessionActive, nearest, displayPrice)
+  const next = calculateNextAction(gold.monitoring, sessionActive, nearest, displayPrice, gold.orb, gold.manipulation)
+  const distance = nearest ? Math.abs(nearest.price - displayPrice) : null
+  const orbDistance = Math.min(Math.abs(displayPrice - gold.orb.high), Math.abs(displayPrice - gold.orb.low))
   const manipulation = calculateManipulationClassification(gold.manipulation)
-  const levelStatus = nearest ? calculateLevelStatus(gold.price, nearest) : 'DISABLED'
+  const levelStatus = nearest ? calculateLevelStatus(displayPrice, nearest) : 'DISABLED'
   const reason = !gold.monitoring
     ? 'Price monitoring is switched off.'
     : nearest
-      ? `Price is ${formatDistance(nearest.price - gold.price, gold.config.priceDecimals)} from today’s ${nearest.direction.toLowerCase()} level at ${formatPrice(nearest.price, gold.config.priceDecimals)}.`
+      ? `Price is ${formatDistance(nearest.price - displayPrice, gold.config.priceDecimals)} from today’s ${nearest.direction.toLowerCase()} level at ${formatPrice(nearest.price, gold.config.priceDecimals)}.`
       : 'No enabled daily-plan level is available.'
 
   const conditions = [
@@ -67,12 +70,26 @@ export function InstrumentOverview({ onTab }: { onTab: (tab: InstrumentTab) => v
     ['Price Near Level', levelStatus === 'APPROACHING' || levelStatus === 'ALERT SENT' || levelStatus === 'IN ZONE', levelStatus],
   ] as const
 
+  const contextRows: [string, string][] = [
+    ['Price', gold.config.symbol === 'XAUUSD' && market.price == null ? '——' : formatPrice(displayPrice, gold.config.priceDecimals)],
+    ['Daily bias', gold.plan.bias],
+    [
+      gold.config.symbol === 'XAUUSD' && market.spread != null ? 'Spread' : 'Daily range',
+      gold.config.symbol === 'XAUUSD' && market.spread != null
+        ? formatPrice(market.spread, gold.config.priceDecimals)
+        : '25.20',
+    ],
+    ['Daily ATR', String(gold.orb.dailyAtr)],
+    ['Session', `${marketSession.name} ${marketSession.state.replace('_', ' ')}`],
+    ['Time remaining', formatSessionDuration(marketSession.timeRemaining)],
+  ]
+
   return (
     <div className="gold-overview-layout">
       <section className={`primary-status status-${statusTone(status)}`}>
         <div className="primary-status-top"><span>Primary status · {marketSession.name} {marketSession.state.replace('_', ' ').toLowerCase()}</span><StatusBadge tone={statusTone(status)}>{status}</StatusBadge></div>
         <div className="primary-status-main">
-          <div><small>Current price</small><strong>{formatPrice(gold.price, gold.config.priceDecimals)}</strong></div>
+          <div><small>Current price</small><strong>{gold.config.symbol === 'XAUUSD' && market.price == null ? '——' : formatPrice(displayPrice, gold.config.priceDecimals)}</strong></div>
           <div><small>Nearest level</small><strong>{nearest ? formatPrice(nearest.price, gold.config.priceDecimals) : '—'}</strong></div>
           <div><small>Distance</small><strong>{distance === null ? '—' : formatPrice(distance, gold.config.priceDecimals)}</strong></div>
         </div>
@@ -110,7 +127,7 @@ export function InstrumentOverview({ onTab }: { onTab: (tab: InstrumentTab) => v
 
       <Card title="Market Context" eyebrow="Supporting market data" className="market-context-card">
         <div className="context-grid">
-          {[['Price', formatPrice(gold.price, gold.config.priceDecimals)], ['Daily bias', gold.plan.bias], ['Daily range', '25.20'], ['Daily ATR', String(gold.orb.dailyAtr)], ['Session', `${marketSession.name} ${marketSession.state.replace('_', ' ')}`], ['Time remaining', formatSessionDuration(marketSession.timeRemaining)]].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+          {contextRows.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
         </div>
       </Card>
 
@@ -270,7 +287,7 @@ export function InstrumentManipulationWorkspace() {
       <div className="orb-detail-grid">
         <Card title="First M15 Candle" eyebrow={`${data.session} session`}>
           <div className="context-grid orb-context">
-            {[['Session', data.session], ['Candle high', formatPrice(data.firstCandleHigh, gold.config.priceDecimals)], ['Candle low', formatPrice(data.firstCandleLow, gold.config.priceDecimals)], ['Candle range', formatPrice(range, gold.config.priceDecimals)], ['Daily ATR', formatPrice(data.dailyAtr, gold.config.priceDecimals)], ['Range / ATR', `${percentage.toFixed(1)}%`], ['Classification', classification], ['Breakout', data.breakoutDirection ?? 'None'], ['Reclaim', data.reclaimed ? 'Confirmed' : 'Waiting'], ['Next action', data.reclaimed ? 'Watch M1' : 'Continue waiting']].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+            {[['Session', data.session], ['Candle high', formatPrice(data.firstCandleHigh, gold.config.priceDecimals)], ['Candle low', formatPrice(data.firstCandleLow, gold.config.priceDecimals)], ['Candle range', formatPrice(range, gold.config.priceDecimals)], ['Daily ATR', formatPrice(data.dailyAtr, gold.config.priceDecimals)], ['Range / ATR', `${percentage.toFixed(1)}%`], ['Classification', classification], ['Breakout', data.breakoutDirection ?? 'None'], ['Reclaim', data.reclaimed ? 'Confirmed' : 'Waiting'], ['Next action', data.reclaimed ? 'Watch M5' : 'Continue waiting']].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
           </div>
           <div className="mock-inputs"><label>Candle high<input type="number" step={gold.config.priceStep} value={data.firstCandleHigh} onChange={(e) => gold.updateManipulation({ firstCandleHigh: Number(e.target.value), breakoutDirection: null, reclaimed: false })} /></label><label>Candle low<input type="number" step={gold.config.priceStep} value={data.firstCandleLow} onChange={(e) => gold.updateManipulation({ firstCandleLow: Number(e.target.value), breakoutDirection: null, reclaimed: false })} /></label></div>
         </Card>

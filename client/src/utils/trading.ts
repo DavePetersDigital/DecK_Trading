@@ -85,7 +85,7 @@ export function calculateInstrumentAttentionStatus(
 
 export function calculateInstrumentStatus(monitoring: boolean, sessionOpen: boolean, nearest: PlannedLevel | null, price: number): StrategyStatus {
   const attention = calculateInstrumentAttentionStatus(monitoring, sessionOpen, nearest, price)
-  if (attention === 'ACTION REQUIRED') return 'WATCH M1'
+  if (attention === 'ACTION REQUIRED') return 'WATCH M5'
   if (attention === 'WAITING' || attention === 'WATCH') return 'MONITORING'
   return attention
 }
@@ -103,13 +103,13 @@ export function calculateNextAction(
   if (!nearest) return { action: 'WAIT', detail: 'No enabled daily-plan levels are available.' }
   const status = calculateLevelStatus(price, nearest)
   if (status === 'IN ZONE' || status === 'PASSED') return {
-    action: 'WATCH M1', detail: `Price is at the ${nearest.direction.toLowerCase()} zone. Look for ${nearest.direction === 'Sell' ? 'bearish' : 'bullish'} confirmation.`,
+    action: 'WATCH M5', detail: `Price is at the ${nearest.direction.toLowerCase()} zone. Look for ${nearest.direction === 'Sell' ? 'bearish' : 'bullish'} confirmation.`,
   }
   if (status === 'APPROACHING' || status === 'ALERT SENT') return {
-    action: 'PREPARE', detail: `Price is approaching ${formatPrice(nearest.price)}. Be ready to open the M1 chart.`,
+    action: 'PREPARE', detail: `Price is approaching ${formatPrice(nearest.price)}. Be ready to open the M5 chart.`,
   }
   if (manipulation?.reclaimed) return {
-    action: 'WATCH M1', detail: 'The manipulation range has been reclaimed. Watch the lower timeframe for confirmation.',
+    action: 'WATCH M5', detail: 'The manipulation range has been reclaimed. Watch the lower timeframe for confirmation.',
   }
   if (orb?.breakoutDirection) return {
     action: 'PREPARE', detail: `A mock ORB breakout ${orb.breakoutDirection.toLowerCase()} is waiting for candle-close confirmation.`,
