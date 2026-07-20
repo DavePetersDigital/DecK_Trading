@@ -23,6 +23,7 @@ export const environment = {
   cTraderRedirectUri: process.env.CTRADER_REDIRECT_URI ?? '',
   cTraderEnvironment: process.env.CTRADER_ENVIRONMENT ?? '',
   cTraderClientSecret: process.env.CTRADER_CLIENT_SECRET ?? '',
+  cTraderAccountId: process.env.CTRADER_ACCOUNT_ID ?? '',
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID ?? '',
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',

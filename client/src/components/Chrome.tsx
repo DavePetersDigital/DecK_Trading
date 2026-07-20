@@ -1,9 +1,25 @@
+import { useCTraderStatus, type CTraderServiceStatus } from '../context/CTraderStatusContext'
 import { useInstrumentStore } from '../context/InstrumentContext'
 import type { InstrumentWorkspaceState, View } from '../types'
 import { SessionBar } from './SessionComponents'
 
 export function StatusBadge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: string }) {
   return <span className={`badge badge--${tone}`}>{children}</span>
+}
+
+const SERVICE_STATUS_LABELS: Record<CTraderServiceStatus, string> = {
+  connected: 'Connected',
+  not_connected: 'Not connected',
+  not_configured: 'Not configured',
+  connection_expired: 'Connection expired',
+  error: 'Error',
+}
+
+function statusDotClass(status: CTraderServiceStatus) {
+  if (status === 'connected') return 'status-dot'
+  if (status === 'connection_expired') return 'status-dot amber'
+  if (status === 'error') return 'status-dot red'
+  return 'status-dot grey'
 }
 
 interface SidebarProps {
@@ -14,6 +30,7 @@ interface SidebarProps {
 
 export function Sidebar({ view, onNavigate, onInstrument }: SidebarProps) {
   const { instruments, selectedSymbol } = useInstrumentStore()
+  const { status: cTraderStatus, canConnect, startConnect, notice } = useCTraderStatus()
   const links: { id: View; label: string; icon: string }[] = [
     { id: 'overview', label: 'Overview', icon: '▦' },
     { id: 'alerts', label: 'Alerts', icon: '◉' },
@@ -48,8 +65,25 @@ export function Sidebar({ view, onNavigate, onInstrument }: SidebarProps) {
         ))}
       </div>
       <div className="sidebar-status">
-        <div><span><i className="status-dot amber" />cTrader</span><small>Mock data</small></div>
-        <div><span><i className="status-dot red" />Telegram</span><small>Not connected</small></div>
+        <p className="nav-label">Services</p>
+        {canConnect ? (
+          <button
+            type="button"
+            className="service-row service-row--actionable"
+            onClick={startConnect}
+            aria-label="Connect cTrader"
+          >
+            <span><i className={statusDotClass(cTraderStatus)} />cTrader</span>
+            <small>{SERVICE_STATUS_LABELS[cTraderStatus]}</small>
+          </button>
+        ) : (
+          <div className="service-row">
+            <span><i className={statusDotClass(cTraderStatus)} />cTrader</span>
+            <small>{SERVICE_STATUS_LABELS[cTraderStatus]}</small>
+          </div>
+        )}
+        <div className="service-row"><span><i className="status-dot red" />Telegram</span><small>Not connected</small></div>
+        {notice && <p className="service-notice">{notice}</p>}
       </div>
     </aside>
   )

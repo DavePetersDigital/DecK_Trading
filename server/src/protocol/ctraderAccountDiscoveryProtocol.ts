@@ -1,7 +1,7 @@
 import protobuf from 'protobufjs'
 
 // Exact subset of Spotware's current Open API proto2 definitions required for
-// application authentication and account discovery.
+// application authentication, account/symbol discovery, and historical trend bars.
 // Source: https://github.com/spotware/openapi-proto-messages
 const schema = `
   syntax = "proto2";
@@ -127,6 +127,17 @@ const schema = `
     optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_APPLICATION_AUTH_RES];
   }
 
+  message ProtoOAAccountAuthReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ACCOUNT_AUTH_REQ];
+    required int64 ctidTraderAccountId = 2;
+    required string accessToken = 3;
+  }
+
+  message ProtoOAAccountAuthRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ACCOUNT_AUTH_RES];
+    required int64 ctidTraderAccountId = 2;
+  }
+
   message ProtoOAErrorRes {
     optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_ERROR_RES];
     optional int64 ctidTraderAccountId = 2;
@@ -161,6 +172,84 @@ const schema = `
     optional ProtoOAClientPermissionScope permissionScope = 3;
     repeated ProtoOACtidTraderAccount ctidTraderAccount = 4;
   }
+
+  message ProtoOASymbolsListReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_LIST_REQ];
+    required int64 ctidTraderAccountId = 2;
+    optional bool includeArchivedSymbols = 3 [default = false];
+  }
+
+  message ProtoOALightSymbol {
+    required int64 symbolId = 1;
+    optional string symbolName = 2;
+    optional bool enabled = 3;
+    optional int64 baseAssetId = 4;
+    optional int64 quoteAssetId = 5;
+    optional int64 symbolCategoryId = 6;
+    optional string description = 7;
+    optional double sortingNumber = 8;
+  }
+
+  message ProtoOAArchivedSymbol {
+    required int64 symbolId = 1;
+    required string name = 2;
+    required int64 utcLastUpdateTimestamp = 3;
+    optional string description = 4;
+  }
+
+  message ProtoOASymbolsListRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_SYMBOLS_LIST_RES];
+    required int64 ctidTraderAccountId = 2;
+    repeated ProtoOALightSymbol symbol = 3;
+    repeated ProtoOAArchivedSymbol archivedSymbol = 4;
+  }
+
+  enum ProtoOATrendbarPeriod {
+    M1 = 1;
+    M2 = 2;
+    M3 = 3;
+    M4 = 4;
+    M5 = 5;
+    M10 = 6;
+    M15 = 7;
+    M30 = 8;
+    H1 = 9;
+    H4 = 10;
+    H12 = 11;
+    D1 = 12;
+    W1 = 13;
+    MN1 = 14;
+  }
+
+  message ProtoOATrendbar {
+    required int64 volume = 3;
+    optional ProtoOATrendbarPeriod period = 4 [default = M1];
+    optional int64 low = 5;
+    optional uint64 deltaOpen = 6;
+    optional uint64 deltaClose = 7;
+    optional uint64 deltaHigh = 8;
+    optional uint32 utcTimestampInMinutes = 9;
+  }
+
+  message ProtoOAGetTrendbarsReq {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_TRENDBARS_REQ];
+    required int64 ctidTraderAccountId = 2;
+    optional int64 fromTimestamp = 3;
+    optional int64 toTimestamp = 4;
+    required ProtoOATrendbarPeriod period = 5;
+    required int64 symbolId = 6;
+    optional uint32 count = 7;
+  }
+
+  message ProtoOAGetTrendbarsRes {
+    optional ProtoOAPayloadType payloadType = 1 [default = PROTO_OA_GET_TRENDBARS_RES];
+    required int64 ctidTraderAccountId = 2;
+    required ProtoOATrendbarPeriod period = 3;
+    optional int64 timestamp = 4 [deprecated = true];
+    repeated ProtoOATrendbar trendbar = 5;
+    optional int64 symbolId = 6;
+    optional bool hasMore = 7;
+  }
 `
 
 const root = protobuf.parse(schema).root
@@ -170,9 +259,15 @@ export const cTraderProtocol = {
   commonError: root.lookupType('ProtoErrorRes'),
   applicationAuthRequest: root.lookupType('ProtoOAApplicationAuthReq'),
   applicationAuthResponse: root.lookupType('ProtoOAApplicationAuthRes'),
+  accountAuthRequest: root.lookupType('ProtoOAAccountAuthReq'),
+  accountAuthResponse: root.lookupType('ProtoOAAccountAuthRes'),
   openApiError: root.lookupType('ProtoOAErrorRes'),
   accountListRequest: root.lookupType('ProtoOAGetAccountListByAccessTokenReq'),
   accountListResponse: root.lookupType('ProtoOAGetAccountListByAccessTokenRes'),
+  symbolsListRequest: root.lookupType('ProtoOASymbolsListReq'),
+  symbolsListResponse: root.lookupType('ProtoOASymbolsListRes'),
+  getTrendbarsRequest: root.lookupType('ProtoOAGetTrendbarsReq'),
+  getTrendbarsResponse: root.lookupType('ProtoOAGetTrendbarsRes'),
 } as const
 
 export const cTraderPayloadType = {
@@ -180,7 +275,23 @@ export const cTraderPayloadType = {
   heartbeat: 51,
   applicationAuthRequest: 2100,
   applicationAuthResponse: 2101,
+  accountAuthRequest: 2102,
+  accountAuthResponse: 2103,
+  symbolsListRequest: 2114,
+  symbolsListResponse: 2115,
+  getTrendbarsRequest: 2137,
+  getTrendbarsResponse: 2138,
   openApiError: 2142,
   accountListRequest: 2149,
   accountListResponse: 2150,
 } as const
+
+export const cTraderTrendbarPeriod = {
+  M5: 5,
+  M15: 7,
+  H1: 9,
+  H4: 10,
+  D1: 12,
+} as const
+
+export type CTraderHistoryTimeframe = keyof typeof cTraderTrendbarPeriod
