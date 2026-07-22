@@ -6,6 +6,7 @@ import { useInstrumentStore } from './context/InstrumentContext'
 import { defaultSettings } from './data/mockData'
 import { AdminPage, AlertsPage, InstrumentPage, OverviewPage } from './pages/DashboardPages'
 import { createDefaultInstrumentState } from './services/instrumentStore'
+import { migrateLegacyTheme } from './theme/theme'
 import type { AppSettings, InstrumentTab, View } from './types'
 
 const marketSimulatorEnabled = import.meta.env.VITE_ENABLE_MARKET_SIMULATOR === 'true'
@@ -19,6 +20,16 @@ function initialRoute(): { view: View; symbol?: string } {
   return { view: 'overview' }
 }
 
+function loadSettings(): AppSettings {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('dp-settings') ?? '{}') as Partial<AppSettings>
+    const theme = migrateLegacyTheme(parsed.theme) ?? defaultSettings.theme
+    return { ...defaultSettings, ...parsed, theme }
+  } catch {
+    return defaultSettings
+  }
+}
+
 function App() {
   const initialRouteRef = useRef(initialRoute())
   const [view, setView] = useState<View>(initialRouteRef.current.view)
@@ -27,13 +38,9 @@ function App() {
   const selectInstrumentRef = useRef(instrumentStore.selectInstrument)
   selectInstrumentRef.current = instrumentStore.selectInstrument
   const instrument = instrumentStore.current
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    try { return { ...defaultSettings, ...JSON.parse(localStorage.getItem('dp-settings') ?? '{}') } }
-    catch { return defaultSettings }
-  })
+  const [settings, setSettings] = useState<AppSettings>(loadSettings)
 
   useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme
     localStorage.setItem('dp-settings', JSON.stringify(settings))
   }, [settings])
 
@@ -67,7 +74,7 @@ function App() {
       <Sidebar view={view} onNavigate={navigate} onInstrument={openInstrument} />
       <div className="workspace">
         <Header instrument={instrument} view={view} />
-        {view === 'overview' && <OverviewPage onOpenInstrument={openInstrument} />}
+        {view === 'overview' && <OverviewPage onOpenInstrument={openInstrument} settings={settings} onSettings={setSettings} />}
         {view === 'instrument' && <InstrumentPage tab={instrumentTab} onTab={setInstrumentTab} />}
         {view === 'alerts' && <AlertsPage />}
         {view === 'admin' && <AdminPage settings={settings} onSettings={setSettings} />}

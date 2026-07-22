@@ -5,15 +5,36 @@ import {
   InstrumentDailyPlanWorkspace, InstrumentHistoryWorkspace, InstrumentManipulationWorkspace,
   InstrumentOperationalSubtitle, InstrumentOrbWorkspace, InstrumentOverview, InstrumentStructureWorkspace,
 } from '../components/TradingAssistantPanels'
-import { MarketCommandCentre } from '../components/MarketCommandCentre'
+import { AttentionDashboard } from '../components/AttentionDashboard'
 import { InstrumentManagement } from '../components/InstrumentManagement'
+import { MonitoredInstrumentRegistry } from '../components/MonitoredInstrumentRegistry'
+import { OpeningProfileEditor } from '../components/OpeningProfileEditor'
 import { CTraderInstrumentCatalogue } from '../components/CTraderInstrumentCatalogue'
 import { useCTraderStatus } from '../context/CTraderStatusContext'
 import { useInstrumentWorkspace } from '../context/InstrumentContext'
+import { useTheme } from '../context/ThemeContext'
+import { migrateLegacyTheme, type ThemePreference } from '../theme/theme'
 import type { AppSettings, InstrumentTab } from '../types'
+import type { RowHighlightMode } from '../utils/marketScanner'
 
-export function OverviewPage({ onOpenInstrument }: { onOpenInstrument: (symbol: string) => void }) {
-  return <MarketCommandCentre onOpenInstrument={onOpenInstrument} />
+// The Overview is now the Attention Dashboard: a thin viewer of backend engine
+// state. It answers "what chart should I open right now?" and no longer depends
+// on the legacy client-side priority queue. `onOpenInstrument` is retained for
+// signature compatibility with the router but is unused by the thin viewer.
+export function OverviewPage({
+  settings,
+  onSettings,
+}: {
+  onOpenInstrument: (symbol: string) => void
+  settings: AppSettings
+  onSettings: (settings: AppSettings) => void
+}) {
+  return (
+    <AttentionDashboard
+      highlightMode={settings.rowHighlightMode ?? 'qualified'}
+      onHighlightModeChange={(mode: RowHighlightMode) => onSettings({ ...settings, rowHighlightMode: mode })}
+    />
+  )
 }
 
 export function InstrumentPage({ tab, onTab }: { tab: InstrumentTab; onTab: (tab: InstrumentTab) => void }) {
@@ -64,11 +85,13 @@ export function AlertsPage() {
 
 export function AdminPage({ settings, onSettings }: { settings: AppSettings; onSettings: (settings: AppSettings) => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const { preference, setThemePreference } = useTheme()
   const { connected: cTraderConnected, canConnect, startConnect, status: cTraderStatus, notice } = useCTraderStatus()
   const connectLabel = cTraderStatus === 'connection_expired' || cTraderStatus === 'error' ? 'Reconnect' : 'Connect'
 
   const exportSettings = () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' }))
+    const payload = { ...settings, theme: preference }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
     const link = document.createElement('a'); link.href = url; link.download = 'deck-trading-dashboard-settings.json'; link.click()
     URL.revokeObjectURL(url)
   }
@@ -76,16 +99,43 @@ export function AdminPage({ settings, onSettings }: { settings: AppSettings; onS
     if (!file) return
     try {
       const parsed = JSON.parse(await file.text()) as Partial<AppSettings>
-      if ((parsed.theme === 'dark' || parsed.theme === 'slate') && typeof parsed.defaultApproachDistance === 'number') onSettings({ ...settings, ...parsed })
-      else window.alert('This settings file is not valid.')
+      const theme = migrateLegacyTheme(parsed.theme)
+      if (theme && typeof parsed.defaultApproachDistance === 'number') {
+        setThemePreference(theme)
+        onSettings({ ...settings, ...parsed, theme })
+      } else window.alert('This settings file is not valid.')
     } catch { window.alert('Unable to read this JSON settings file.') }
   }
+
+  const onThemeChange = (next: ThemePreference) => {
+    setThemePreference(next)
+    onSettings({ ...settings, theme: next })
+  }
+
   return (
     <main className="content">
       <div className="page-intro"><div><span>System configuration</span><h1>Admin</h1><p>Local preferences and future service integrations.</p></div></div>
       <InstrumentManagement />
+      <MonitoredInstrumentRegistry connected={cTraderConnected} />
+      <OpeningProfileEditor />
       <div className="settings-grid">
-        <Card title="Appearance" eyebrow="Interface"><div className="setting-line"><div><strong>Interface theme</strong><span>Choose terminal contrast</span></div><select aria-label="Interface theme" value={settings.theme} onChange={(e) => onSettings({ ...settings, theme: e.target.value as AppSettings['theme'] })}><option value="dark">Deep navy</option><option value="slate">Slate dark</option></select></div></Card>
+        <Card title="Appearance" eyebrow="Interface">
+          <div className="setting-line">
+            <div>
+              <strong>Interface theme</strong>
+              <span>Light, Dark, or follow the system appearance</span>
+            </div>
+            <select
+              aria-label="Interface theme"
+              value={preference}
+              onChange={(e) => onThemeChange(e.target.value as ThemePreference)}
+            >
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="system">System</option>
+            </select>
+          </div>
+        </Card>
         <Card title="Alert defaults" eyebrow="Monitoring"><label className="admin-field">Default approach distance<input type="number" min="0.1" step="0.1" value={settings.defaultApproachDistance} onChange={(e) => onSettings({ ...settings, defaultApproachDistance: Number(e.target.value) })} /></label></Card>
         <Card title="Sessions" eyebrow="Defaults"><div className="setting-line"><div><strong>Three market sessions</strong><span>Tokyo, London and New York</span></div><StatusBadge tone="positive">Active</StatusBadge></div></Card>
         <Card title="cTrader API" eyebrow="Integration">

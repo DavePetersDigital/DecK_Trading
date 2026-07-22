@@ -72,14 +72,33 @@ export function InstrumentOverview({ onTab }: { onTab: (tab: InstrumentTab) => v
 
   const contextRows: [string, string][] = [
     ['Price', gold.config.symbol === 'XAUUSD' && market.price == null ? '——' : formatPrice(displayPrice, gold.config.priceDecimals)],
-    ['Daily bias', gold.plan.bias],
+    ['Daily bias', gold.config.symbol === 'XAUUSD'
+      ? (market.dailyEmaBias.loading
+        ? '——'
+        : market.dailyEmaBias.error || market.dailyEmaBias.bias == null
+          ? '—'
+          : market.dailyEmaBias.bias)
+      : gold.plan.bias],
     [
       gold.config.symbol === 'XAUUSD' && market.spread != null ? 'Spread' : 'Daily range',
       gold.config.symbol === 'XAUUSD' && market.spread != null
         ? formatPrice(market.spread, gold.config.priceDecimals)
         : '25.20',
     ],
-    ['Daily ATR', String(gold.orb.dailyAtr)],
+    ['Daily ATR', gold.config.symbol === 'XAUUSD'
+      ? (market.dailyAtr.loading
+        ? '——'
+        : market.dailyAtr.error || market.dailyAtr.value == null
+          ? '—'
+          : formatPrice(market.dailyAtr.value, gold.config.priceDecimals))
+      : String(gold.orb.dailyAtr)],
+    ['Daily 200 EMA', gold.config.symbol === 'XAUUSD'
+      ? (market.dailyEmaBias.loading
+        ? '——'
+        : market.dailyEmaBias.error || market.dailyEmaBias.ema200 == null
+          ? '—'
+          : formatPrice(market.dailyEmaBias.ema200, gold.config.priceDecimals))
+      : formatPrice(gold.structure.dailyEma200, gold.config.priceDecimals)],
     ['Session', `${marketSession.name} ${marketSession.state.replace('_', ' ')}`],
     ['Time remaining', formatSessionDuration(marketSession.timeRemaining)],
   ]

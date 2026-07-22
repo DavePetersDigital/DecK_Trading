@@ -1,3 +1,10 @@
+/**
+ * @deprecated Legacy mock-driven "command centre". Superseded by
+ * {@link AttentionDashboard}, which is a thin viewer of the backend ORB engine.
+ * This component is no longer mounted in the primary workflow and is retained
+ * only until the legacy client-side priority queue is removed in a future
+ * cleanup task. Do not add new features here.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInstrumentStore } from '../context/InstrumentContext'
 import { useInstrumentQueue } from '../hooks/useInstrumentQueue'
@@ -8,6 +15,7 @@ import {
 } from '../utils/instrumentPriority'
 import { statusTone } from '../utils/trading'
 import { StatusBadge } from './Chrome'
+import { OrbEnginePanel } from './OrbEnginePanel'
 
 const COLLAPSE_STORAGE_KEY = 'deck-priority-groups-v1'
 
@@ -218,6 +226,8 @@ export function MarketCommandCentre({ onOpenInstrument }: { onOpenInstrument: (s
         })}
         {visibleQueue.length === 0 && <div className="queue-empty">No instruments match the current watchlist filters.</div>}
       </div>
+
+      <OrbEnginePanel />
     </main>
   )
 }

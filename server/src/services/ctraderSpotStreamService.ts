@@ -35,6 +35,18 @@ export interface LiveSpotSnapshot {
 
 type SpotListener = (snapshot: LiveSpotSnapshot) => void
 
+// Generic per-symbol tick, consumed by the backend ORB engine. XAUUSD keeps
+// its dedicated snapshot (above) for the dashboard SSE; the engine only needs
+// bid/ask crossings for every monitored symbol.
+export interface LiveTick {
+  symbolId: string
+  bid: number
+  ask: number
+  timestamp: string
+}
+
+type TickListener = (tick: LiveTick) => void
+
 interface ProtobufLong {
   low: number
   high: number
@@ -50,6 +62,16 @@ let reconnectAttempt = 0
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let starting = false
 let digits = 2
+
+const DEFAULT_SYMBOL_DIGITS = 5
+// Symbols the stream should subscribe to. XAUUSD is always present so the
+// dashboard snapshot behaviour is unchanged; the engine adds more via
+// subscribeSpotSymbols().
+const desiredSymbols = new Set<string>([XAUUSD_SYMBOL_ID])
+const subscribedSymbols = new Set<string>()
+const digitsBySymbol = new Map<string, number>()
+let accountAuthed = false
+
 let latestSnapshot: LiveSpotSnapshot = createDisconnectedSnapshot()
 
 function createDisconnectedSnapshot(error: string | null = null): LiveSpotSnapshot {
@@ -128,6 +150,32 @@ function publish(snapshot: LiveSpotSnapshot) {
   spotEvents.emit('snapshot', snapshot)
 }
 
+function toLongArray(ids: string[]): ProtobufLong[] {
+  const longConstructor = protobuf.util.Long as unknown as {
+    fromString: (value: string, unsigned?: boolean) => ProtobufLong
+  }
+  return ids.map((id) => longConstructor.fromString(id, false))
+}
+
+function requestSymbolDetails(activeSocket: TLSSocket, ids: string[]) {
+  if (ids.length === 0) return
+  sendMessage(activeSocket, cTraderPayloadType.symbolByIdRequest, cTraderProtocol.symbolByIdRequest, {
+    ctidTraderAccountId: getConfiguredAccountId(),
+    symbolId: toLongArray(ids),
+  })
+}
+
+function subscribeMissingSymbols(activeSocket: TLSSocket) {
+  const toSubscribe = [...desiredSymbols].filter((id) => !subscribedSymbols.has(id))
+  if (toSubscribe.length === 0) return
+  sendMessage(activeSocket, cTraderPayloadType.subscribeSpotsRequest, cTraderProtocol.subscribeSpotsRequest, {
+    ctidTraderAccountId: getConfiguredAccountId(),
+    symbolId: toLongArray(toSubscribe),
+    subscribeToSpotTimestamp: true,
+  })
+  for (const id of toSubscribe) subscribedSymbols.add(id)
+}
+
 function clearReconnectTimer() {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
@@ -152,6 +200,8 @@ function destroySocket(sendUnsubscribe = false) {
     }
   }
   socket = null
+  accountAuthed = false
+  subscribedSymbols.clear()
   current.removeAllListeners()
   current.destroy()
 }
@@ -189,41 +239,52 @@ function handleSpotEvent(payload: Uint8Array) {
     timestamp?: string | number
   }
 
-  if (String(spot.symbolId ?? '') !== XAUUSD_SYMBOL_ID) return
+  const symbolId = String(spot.symbolId ?? '')
+  if (!desiredSymbols.has(symbolId)) return
+
+  const symbolDigits = digitsBySymbol.get(symbolId)
+    ?? (symbolId === XAUUSD_SYMBOL_ID ? digits : DEFAULT_SYMBOL_DIGITS)
 
   const bidRaw = toNumber(spot.bid)
   const askRaw = toNumber(spot.ask)
-  const bid = Number.isFinite(bidRaw) ? roundToDigits(bidRaw / PRICE_SCALE, digits) : null
-  const ask = Number.isFinite(askRaw) ? roundToDigits(askRaw / PRICE_SCALE, digits) : null
+  const bid = Number.isFinite(bidRaw) ? roundToDigits(bidRaw / PRICE_SCALE, symbolDigits) : null
+  const ask = Number.isFinite(askRaw) ? roundToDigits(askRaw / PRICE_SCALE, symbolDigits) : null
   if (bid == null && ask == null) return
 
   const resolvedBid = bid ?? ask
   const resolvedAsk = ask ?? bid
   if (resolvedBid == null || resolvedAsk == null) return
 
-  const mid = roundToDigits((resolvedBid + resolvedAsk) / 2, digits)
-  const spread = roundToDigits(resolvedAsk - resolvedBid, Math.max(digits, 2))
   const timestampMs = toNumber(spot.timestamp)
   const timestamp = Number.isFinite(timestampMs) && timestampMs > 0
     ? new Date(timestampMs).toISOString()
     : new Date().toISOString()
 
   reconnectAttempt = 0
-  publish({
-    symbolId: XAUUSD_SYMBOL_ID,
-    symbolName: XAUUSD_SYMBOL_NAME,
-    bid: resolvedBid,
-    ask: resolvedAsk,
-    mid,
-    spread,
-    digits,
-    timestamp,
-    source: 'ctrader_live',
-    connected: true,
-    subscribed: true,
-    status: 'live',
-    error: null,
-  })
+
+  // Generic tick for the ORB engine (all monitored symbols).
+  spotEvents.emit('tick', { symbolId, bid: resolvedBid, ask: resolvedAsk, timestamp } satisfies LiveTick)
+
+  // XAUUSD retains its dedicated snapshot for the dashboard live-price SSE.
+  if (symbolId === XAUUSD_SYMBOL_ID) {
+    const mid = roundToDigits((resolvedBid + resolvedAsk) / 2, symbolDigits)
+    const spread = roundToDigits(resolvedAsk - resolvedBid, Math.max(symbolDigits, 2))
+    publish({
+      symbolId: XAUUSD_SYMBOL_ID,
+      symbolName: XAUUSD_SYMBOL_NAME,
+      bid: resolvedBid,
+      ask: resolvedAsk,
+      mid,
+      spread,
+      digits: symbolDigits,
+      timestamp,
+      source: 'ctrader_live',
+      connected: true,
+      subscribed: true,
+      status: 'live',
+      error: null,
+    })
+  }
 }
 
 function handleEnvelope(activeSocket: TLSSocket, payloadType: number, payload: Uint8Array) {
@@ -256,13 +317,8 @@ function handleEnvelope(activeSocket: TLSSocket, payloadType: number, payload: U
 
   if (payloadType === cTraderPayloadType.accountAuthResponse) {
     cTraderProtocol.accountAuthResponse.decode(payload)
-    const longConstructor = protobuf.util.Long as unknown as {
-      fromString: (value: string, unsigned?: boolean) => ProtobufLong
-    }
-    sendMessage(activeSocket, cTraderPayloadType.symbolByIdRequest, cTraderProtocol.symbolByIdRequest, {
-      ctidTraderAccountId: getConfiguredAccountId(),
-      symbolId: [longConstructor.fromString(XAUUSD_SYMBOL_ID, false)],
-    })
+    accountAuthed = true
+    requestSymbolDetails(activeSocket, [...desiredSymbols])
     return
   }
 
@@ -272,18 +328,14 @@ function handleEnvelope(activeSocket: TLSSocket, payloadType: number, payload: U
       longs: String,
       defaults: false,
     }) as { symbol?: Array<{ symbolId?: string; digits?: number }> }
-    const symbol = (body.symbol ?? []).find((item) => String(item.symbolId ?? '') === XAUUSD_SYMBOL_ID)
-    if (symbol && Number.isInteger(symbol.digits) && (symbol.digits as number) >= 0) {
-      digits = symbol.digits as number
+    for (const item of body.symbol ?? []) {
+      const id = String(item.symbolId ?? '')
+      if (id && Number.isInteger(item.digits) && (item.digits as number) >= 0) {
+        digitsBySymbol.set(id, item.digits as number)
+        if (id === XAUUSD_SYMBOL_ID) digits = item.digits as number
+      }
     }
-    const longConstructor = protobuf.util.Long as unknown as {
-      fromString: (value: string, unsigned?: boolean) => ProtobufLong
-    }
-    sendMessage(activeSocket, cTraderPayloadType.subscribeSpotsRequest, cTraderProtocol.subscribeSpotsRequest, {
-      ctidTraderAccountId: getConfiguredAccountId(),
-      symbolId: [longConstructor.fromString(XAUUSD_SYMBOL_ID, false)],
-      subscribeToSpotTimestamp: true,
-    })
+    subscribeMissingSymbols(activeSocket)
     return
   }
 
@@ -402,6 +454,8 @@ function openSocket() {
     if (socket !== nextSocket && socket !== null) return
     socket = null
     starting = false
+    accountAuthed = false
+    subscribedSymbols.clear()
     if (getCTraderAccessToken()) {
       scheduleReconnect('cTrader Open API closed the spot stream.')
     } else {
@@ -419,6 +473,41 @@ export function subscribeToLiveSpotSnapshots(listener: SpotListener) {
   return () => {
     spotEvents.off('snapshot', listener)
   }
+}
+
+/** Subscribe to per-symbol ticks for every subscribed cTrader symbol. */
+export function onSpotTick(listener: TickListener) {
+  spotEvents.on('tick', listener)
+  return () => {
+    spotEvents.off('tick', listener)
+  }
+}
+
+/**
+ * Ensure the shared stream is subscribed to the given cTrader symbol ids
+ * (in addition to XAUUSD). Safe to call repeatedly; new ids are requested on
+ * the live connection or picked up automatically after the next (re)connect.
+ */
+export function subscribeSpotSymbols(symbolIds: string[]) {
+  const newlyAdded: string[] = []
+  for (const raw of symbolIds) {
+    const id = String(raw).trim()
+    if (/^\d+$/.test(id) && !desiredSymbols.has(id)) {
+      desiredSymbols.add(id)
+      newlyAdded.push(id)
+    }
+  }
+  if (newlyAdded.length > 0 && socket && accountAuthed) {
+    try {
+      requestSymbolDetails(socket, newlyAdded)
+    } catch {
+      // The next reconnect will request details for all desired symbols.
+    }
+  }
+}
+
+export function getSubscribedSpotSymbols(): string[] {
+  return [...desiredSymbols]
 }
 
 export function ensureCTraderSpotStream() {

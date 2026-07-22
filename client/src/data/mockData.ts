@@ -41,9 +41,10 @@ export const defaultStructure: StructureData = {
 }
 
 export const defaultSettings: AppSettings = {
-  theme: 'dark',
+  theme: 'light',
   defaultApproachDistance: 3,
   sessionEnabled: { Tokyo: true, London: true, 'New York': true },
+  rowHighlightMode: 'qualified',
 }
 
 export const initialAlerts: Alert[] = [

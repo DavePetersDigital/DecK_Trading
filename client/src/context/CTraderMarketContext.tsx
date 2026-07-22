@@ -11,20 +11,55 @@ import { useCTraderStatus } from './CTraderStatusContext'
 import { useInstrumentStore } from './InstrumentContext'
 import { useSession } from '../hooks/useSession'
 import { fetchCTraderHistory } from '../services/ctraderApi'
-import { selectLatestCompletedM5Candle } from '../services/ctraderMarketData'
+import {
+  isCompletedD1AtrStale,
+  selectCompletedCandles,
+  selectLatestCompletedM5Candle,
+  D1_DURATION_MS,
+} from '../services/ctraderMarketData'
 import { CTRADER_AUTH_SUCCESS, CTRADER_OAUTH_ORIGIN, isCTraderAuthMessage } from '../services/ctraderOAuth'
+import { calculateWilderAtr } from '../utils/atr'
+import { calculateBiasFromEma, calculateEma, type DailyBiasDirection } from '../utils/ema'
 import { hasActiveMonitoredSession } from '../utils/instrumentSessions'
 
 export const XAUUSD_CTRADER_SYMBOL_ID = '41'
 export const XAUUSD_SYMBOL_NAME = 'XAUUSD'
 const M5_FALLBACK_POLL_MS = 60_000
 const HISTORY_COUNT = 5
+const D1_HISTORY_COUNT = 250
+const D1_ATR_PERIOD = 14
+const D1_EMA_PERIOD = 200
+const D1_INDICATOR_REFRESH_MS = 60 * 60 * 1000
 const LIVE_STALE_MS = 30_000
 const RECONNECT_BASE_MS = 1_000
 const RECONNECT_MAX_MS = 15_000
 
 export type MarketSource = 'ctrader_live' | 'ctrader_history' | null
 export type MarketFreshness = 'live' | 'latest_completed_candle' | 'stale' | 'fallback' | null
+
+export interface DailyAtrSnapshot {
+  symbolId: string
+  symbolName: string
+  timeframe: 'D1'
+  period: number
+  value: number | null
+  candleTime: string | null
+  source: 'ctrader_history' | null
+  loading: boolean
+  stale: boolean
+  error: string | null
+}
+
+export interface DailyEmaBiasSnapshot {
+  ema200: number | null
+  bias: DailyBiasDirection | null
+  timeframe: 'D1'
+  source: 'ctrader_history' | null
+  loading: boolean
+  stale: boolean
+  error: string | null
+  candleTime: string | null
+}
 
 export interface CTraderMarketSnapshot {
   symbolId: string
@@ -42,10 +77,13 @@ export interface CTraderMarketSnapshot {
   stale: boolean
   error: string | null
   sourceLabel: string
+  dailyAtr: DailyAtrSnapshot
+  dailyEmaBias: DailyEmaBiasSnapshot
 }
 
 interface CTraderMarketContextValue extends CTraderMarketSnapshot {
   refreshMarket: () => Promise<void>
+  refreshDailyAtr: () => Promise<void>
 }
 
 interface LiveTick {
@@ -73,6 +111,30 @@ interface LiveStreamPayload {
   message?: string
 }
 
+const defaultDailyAtr: DailyAtrSnapshot = {
+  symbolId: XAUUSD_CTRADER_SYMBOL_ID,
+  symbolName: XAUUSD_SYMBOL_NAME,
+  timeframe: 'D1',
+  period: D1_ATR_PERIOD,
+  value: null,
+  candleTime: null,
+  source: null,
+  loading: false,
+  stale: false,
+  error: null,
+}
+
+const defaultDailyEmaBias: DailyEmaBiasSnapshot = {
+  ema200: null,
+  bias: null,
+  timeframe: 'D1',
+  source: null,
+  loading: false,
+  stale: false,
+  error: null,
+  candleTime: null,
+}
+
 const defaultSnapshot: CTraderMarketSnapshot = {
   symbolId: XAUUSD_CTRADER_SYMBOL_ID,
   symbolName: XAUUSD_SYMBOL_NAME,
@@ -89,6 +151,8 @@ const defaultSnapshot: CTraderMarketSnapshot = {
   stale: false,
   error: null,
   sourceLabel: 'CTRADER · DISCONNECTED',
+  dailyAtr: defaultDailyAtr,
+  dailyEmaBias: defaultDailyEmaBias,
 }
 
 const CTraderMarketContext = createContext<CTraderMarketContextValue | null>(null)
@@ -108,6 +172,8 @@ function buildSnapshot(params: {
   error: string | null
   live: LiveTick | null
   m5: M5Fallback | null
+  dailyAtr: DailyAtrSnapshot
+  dailyEmaBias: DailyEmaBiasSnapshot
   marketActive?: boolean
   now?: number
 }): CTraderMarketSnapshot {
@@ -134,6 +200,15 @@ function buildSnapshot(params: {
     : usingFallback
       ? params.m5!.price
       : null
+
+  // Bias tracks live mid vs EMA200; it updates on ticks without refetching D1.
+  const liveMidForBias = params.connected && params.live != null ? params.live.mid : null
+  const dailyEmaBias: DailyEmaBiasSnapshot = params.connected
+    ? {
+        ...params.dailyEmaBias,
+        bias: calculateBiasFromEma(liveMidForBias, params.dailyEmaBias.ema200),
+      }
+    : { ...defaultDailyEmaBias }
 
   return {
     symbolId: XAUUSD_CTRADER_SYMBOL_ID,
@@ -165,6 +240,10 @@ function buildSnapshot(params: {
     stale: retainingStaleLive || usingFallback || (!params.connected && price != null),
     error: marketActive ? params.error : null,
     sourceLabel,
+    dailyAtr: params.connected
+      ? params.dailyAtr
+      : { ...defaultDailyAtr },
+    dailyEmaBias,
   }
 }
 
@@ -178,11 +257,14 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
   const [snapshot, setSnapshot] = useState<CTraderMarketSnapshot>(defaultSnapshot)
   const liveRef = useRef<LiveTick | null>(null)
   const m5Ref = useRef<M5Fallback | null>(null)
+  const dailyAtrRef = useRef<DailyAtrSnapshot>(defaultDailyAtr)
+  const dailyEmaBiasRef = useRef<DailyEmaBiasSnapshot>(defaultDailyEmaBias)
   const loadingRef = useRef(false)
   const errorRef = useRef<string | null>(null)
   const connectedRef = useRef(connected)
   connectedRef.current = connected
   const m5InFlightRef = useRef<Promise<void> | null>(null)
+  const atrInFlightRef = useRef<Promise<void> | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectAttemptRef = useRef(0)
   const reconnectTimerRef = useRef<number | null>(null)
@@ -200,6 +282,8 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
       error: errorRef.current,
       live: liveRef.current,
       m5: m5Ref.current,
+      dailyAtr: dailyAtrRef.current,
+      dailyEmaBias: dailyEmaBiasRef.current,
       marketActive: marketActiveRef.current,
     })
     setSnapshot(next)
@@ -239,6 +323,107 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
       m5InFlightRef.current = null
     })
     return m5InFlightRef.current
+  }, [syncSnapshot])
+
+  const refreshDailyAtr = useCallback(async () => {
+    if (!connectedRef.current) return
+    if (atrInFlightRef.current) return atrInFlightRef.current
+
+    const previousAtr = dailyAtrRef.current
+    const previousEma = dailyEmaBiasRef.current
+    dailyAtrRef.current = {
+      ...previousAtr,
+      loading: previousAtr.value == null,
+      error: null,
+    }
+    dailyEmaBiasRef.current = {
+      ...previousEma,
+      loading: previousEma.ema200 == null,
+      error: null,
+    }
+    syncSnapshot()
+
+    const run = (async () => {
+      try {
+        const candles = await fetchCTraderHistory({
+          symbolId: XAUUSD_CTRADER_SYMBOL_ID,
+          timeframe: 'D1',
+          count: D1_HISTORY_COUNT,
+        })
+        const completed = selectCompletedCandles(candles, D1_DURATION_MS)
+        const candleTime = completed[completed.length - 1]?.time ?? null
+        const stale = candleTime != null ? isCompletedD1AtrStale(candleTime) : true
+
+        const atr = calculateWilderAtr(completed, D1_ATR_PERIOD)
+        if (atr && Number.isFinite(atr.value)) {
+          dailyAtrRef.current = {
+            symbolId: XAUUSD_CTRADER_SYMBOL_ID,
+            symbolName: XAUUSD_SYMBOL_NAME,
+            timeframe: 'D1',
+            period: D1_ATR_PERIOD,
+            value: atr.value,
+            candleTime: atr.candleTime ?? candleTime,
+            source: 'ctrader_history',
+            loading: false,
+            stale,
+            error: null,
+          }
+        } else {
+          throw new Error('Not enough completed D1 candles to calculate ATR(14).')
+        }
+
+        const ema = calculateEma(completed.map((candle) => candle.close), D1_EMA_PERIOD)
+        if (ema && Number.isFinite(ema.value)) {
+          dailyEmaBiasRef.current = {
+            ema200: ema.value,
+            bias: null,
+            timeframe: 'D1',
+            source: 'ctrader_history',
+            loading: false,
+            stale,
+            error: null,
+            candleTime,
+          }
+        } else {
+          dailyEmaBiasRef.current = {
+            ...dailyEmaBiasRef.current,
+            loading: false,
+            stale: dailyEmaBiasRef.current.ema200 != null,
+            error: 'Not enough completed D1 candles to calculate EMA(200).',
+            ema200: dailyEmaBiasRef.current.ema200,
+            source: dailyEmaBiasRef.current.ema200 != null ? 'ctrader_history' : null,
+          }
+          console.error('[cTrader daily EMA]', dailyEmaBiasRef.current.error)
+        }
+
+        syncSnapshot()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to calculate D1 indicators.'
+        console.error('[cTrader daily indicators]', message)
+        dailyAtrRef.current = {
+          ...dailyAtrRef.current,
+          loading: false,
+          stale: dailyAtrRef.current.value != null,
+          error: message,
+          value: dailyAtrRef.current.value,
+          source: dailyAtrRef.current.value != null ? 'ctrader_history' : null,
+        }
+        dailyEmaBiasRef.current = {
+          ...dailyEmaBiasRef.current,
+          loading: false,
+          stale: dailyEmaBiasRef.current.ema200 != null,
+          error: message,
+          ema200: dailyEmaBiasRef.current.ema200,
+          source: dailyEmaBiasRef.current.ema200 != null ? 'ctrader_history' : null,
+        }
+        syncSnapshot()
+      }
+    })()
+
+    atrInFlightRef.current = run.finally(() => {
+      atrInFlightRef.current = null
+    })
+    return atrInFlightRef.current
   }, [syncSnapshot])
 
   const clearReconnectTimer = useCallback(() => {
@@ -322,6 +507,8 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
   closeStreamRef.current = closeStream
   const refreshM5FallbackRef = useRef(refreshM5Fallback)
   refreshM5FallbackRef.current = refreshM5Fallback
+  const refreshDailyAtrRef = useRef(refreshDailyAtr)
+  refreshDailyAtrRef.current = refreshDailyAtr
   const syncSnapshotRef = useRef(syncSnapshot)
   syncSnapshotRef.current = syncSnapshot
 
@@ -329,6 +516,9 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
     if (!connected) {
       closeStreamRef.current()
       liveRef.current = null
+      m5Ref.current = null
+      dailyAtrRef.current = defaultDailyAtr
+      dailyEmaBiasRef.current = defaultDailyEmaBias
       loadingRef.current = false
       errorRef.current = null
       reconnectAttemptRef.current = 0
@@ -337,10 +527,14 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
     }
 
     void refreshM5FallbackRef.current()
+    void refreshDailyAtrRef.current()
     openStreamRef.current()
     const m5Timer = window.setInterval(() => {
       void refreshM5FallbackRef.current()
     }, M5_FALLBACK_POLL_MS)
+    const atrTimer = window.setInterval(() => {
+      void refreshDailyAtrRef.current()
+    }, D1_INDICATOR_REFRESH_MS)
     const staleTimer = window.setInterval(() => {
       if (!liveRef.current) return
       if (liveTickAgeMs(liveRef.current, Date.now()) > LIVE_STALE_MS) syncSnapshotRef.current()
@@ -348,6 +542,7 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
 
     return () => {
       window.clearInterval(m5Timer)
+      window.clearInterval(atrTimer)
       window.clearInterval(staleTimer)
       closeStreamRef.current()
     }
@@ -364,6 +559,7 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
       if (event.data.type !== CTRADER_AUTH_SUCCESS) return
       reconnectAttemptRef.current = 0
       void refreshM5FallbackRef.current()
+      void refreshDailyAtrRef.current()
       closeStreamRef.current()
       openStreamRef.current()
     }
@@ -374,7 +570,8 @@ export function CTraderMarketProvider({ children }: { children: React.ReactNode 
   const value = useMemo<CTraderMarketContextValue>(() => ({
     ...snapshot,
     refreshMarket: refreshM5Fallback,
-  }), [snapshot, refreshM5Fallback])
+    refreshDailyAtr,
+  }), [snapshot, refreshM5Fallback, refreshDailyAtr])
 
   return <CTraderMarketContext.Provider value={value}>{children}</CTraderMarketContext.Provider>
 }

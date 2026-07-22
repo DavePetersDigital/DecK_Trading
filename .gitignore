@@ -17,6 +17,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Local runtime configuration (monitored-instrument registry, etc.)
+data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

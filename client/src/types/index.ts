@@ -3,7 +3,7 @@ import type { SessionId } from './session'
 export type View = 'overview' | 'instrument' | 'alerts' | 'admin'
 export type InstrumentTab = 'overview' | 'orb' | 'plan' | 'structure' | 'manipulation' | 'history'
 export type GoldTab = InstrumentTab
-export type Theme = 'dark' | 'slate'
+export type Theme = 'light' | 'dark' | 'system'
 export type Bias = 'Bullish' | 'Bearish' | 'Neutral'
 export type Direction = 'Buy' | 'Sell'
 export type InstrumentCategory = 'Metal' | 'Forex' | 'Index' | 'Energy' | 'Crypto' | 'Other'
@@ -192,4 +192,6 @@ export interface AppSettings {
   theme: Theme
   defaultApproachDistance: number
   sessionEnabled: Record<string, boolean>
+  /** Whole-row attention tint mode for the Market Scanner. */
+  rowHighlightMode: 'qualified' | 'any' | 'never'
 }

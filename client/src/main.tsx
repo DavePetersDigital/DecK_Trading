@@ -6,17 +6,20 @@ import { CTraderMarketProvider } from './context/CTraderMarketContext.tsx'
 import { CTraderStatusProvider } from './context/CTraderStatusContext.tsx'
 import { InstrumentProvider } from './context/InstrumentContext.tsx'
 import { SessionProvider } from './context/SessionProvider.tsx'
+import { ThemeProvider } from './context/ThemeContext.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <SessionProvider>
-      <InstrumentProvider>
-        <CTraderStatusProvider>
-          <CTraderMarketProvider>
-            <App />
-          </CTraderMarketProvider>
-        </CTraderStatusProvider>
-      </InstrumentProvider>
-    </SessionProvider>
+    <ThemeProvider>
+      <SessionProvider>
+        <InstrumentProvider>
+          <CTraderStatusProvider>
+            <CTraderMarketProvider>
+              <App />
+            </CTraderMarketProvider>
+          </CTraderStatusProvider>
+        </InstrumentProvider>
+      </SessionProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

@@ -1,45 +1,157 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 
-:root {
+/* Light theme (default). Soft cool-neutral presentation. */
+:root,
+:root[data-theme='light'] {
   font-family: Inter, system-ui, sans-serif;
-  color: #d8e0e9;
-  background: #080d14;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --bg: #080d14;
-  --sidebar: #0a1019;
-  --panel: #0e1621;
-  --panel-raised: #111c28;
-  --border: #202d3b;
-  --border-soft: #172330;
-  --text: #d8e0e9;
-  --muted: #758598;
-  --faint: #526173;
-  --green: #35d089;
-  --amber: #e6ad45;
-  --red: #ed6673;
-  --blue: #438cf4;
-  --gold: #d5a84d;
+
+  --app-background: #e8edf2;
+  --panel-background: #ffffff;
+  --panel-background-raised: #f4f7fa;
+  --table-header-background: #d9e1ea;
+  --table-row-background: #ffffff;
+  --table-row-hover: #eef3f8;
+  --border-colour: #c5d0dc;
+  --border-soft-colour: #d7e0e9;
+  --text-primary: #1c2430;
+  --text-secondary: #526173;
+  --text-muted: #6b7c8f;
+  --control-background: #ffffff;
+  --control-hover: #e8eef4;
+  --control-active: #dce6f0;
+  --input-background: #ffffff;
+  --shadow-colour: #1c24301a;
+  --header-background: #fffffff2;
+  --sidebar-background: #f2f5f8;
+  --nav-active-background: #e4ecf5;
+  --nav-active-text: #1a4f8c;
+  --brand-mark-border: #9bb4cc;
+  --brand-mark-background: #e8eef5;
+  --brand-mark-text: #2a5f9a;
+
+  --status-green: #1a7a4c;
+  --status-green-background: #e4f5ec;
+  --status-red: #c0394a;
+  --status-red-background: #f8e8ea;
+  --status-orange: #b86a14;
+  --status-orange-background: #f8efdf;
+  --status-grey: #667788;
+  --status-grey-background: #e8edf2;
+  --status-blue: #2b6cb0;
+  --status-blue-background: #e4eef8;
+
+  --row-bullish-background: #eaf6ef;
+  --row-bearish-background: #f8ecee;
+  --row-neutral-attention-background: #f6f0e4;
+  --row-attention-accent: #b8860b;
+
+  --badge-background: #eef2f6;
+  --badge-text: #5a6b7c;
+  --alert-feed-background: #f4f7fa;
+  --error-panel-background: #f8e8ea;
+
+  /* Legacy aliases used throughout App.css */
+  --bg: var(--app-background);
+  --sidebar: var(--sidebar-background);
+  --panel: var(--panel-background);
+  --panel-raised: var(--panel-background-raised);
+  --border: var(--border-colour);
+  --border-soft: var(--border-soft-colour);
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --faint: var(--text-muted);
+  --green: var(--status-green);
+  --amber: var(--status-orange);
+  --red: var(--status-red);
+  --blue: var(--status-blue);
+  --gold: #a67c2a;
+
+  color: var(--text-primary);
+  background: var(--app-background);
 }
 
-:root[data-theme='slate'] {
-  --bg: #111820;
-  --sidebar: #151e28;
-  --panel: #19232e;
-  --panel-raised: #202c38;
-  --border: #304050;
-  --border-soft: #263542;
+/* Dark theme — current terminal look as the starting point. */
+:root[data-theme='dark'] {
+  --app-background: #080d14;
+  --panel-background: #0e1621;
+  --panel-background-raised: #111c28;
+  --table-header-background: #0d1824;
+  --table-row-background: #0e1621;
+  --table-row-hover: #142231;
+  --border-colour: #202d3b;
+  --border-soft-colour: #172330;
+  --text-primary: #d8e0e9;
+  --text-secondary: #8a9bb0;
+  --text-muted: #758598;
+  --control-background: #101c29;
+  --control-hover: #142231;
+  --control-active: #12243a;
+  --input-background: #09111a;
+  --shadow-colour: #00000080;
+  --header-background: #0b121bf2;
+  --sidebar-background: #0a1019;
+  --nav-active-background: #12243a;
+  --nav-active-text: #b8d6ff;
+  --brand-mark-border: #365273;
+  --brand-mark-background: #17304e;
+  --brand-mark-text: #8dbbfa;
+
+  --status-green: #35d089;
+  --status-green-background: #10271e;
+  --status-red: #ed6673;
+  --status-red-background: #29151a;
+  --status-orange: #e6ad45;
+  --status-orange-background: #291f10;
+  --status-grey: #8a9bb0;
+  --status-grey-background: #151c26;
+  --status-blue: #438cf4;
+  --status-blue-background: #101d2a;
+
+  --row-bullish-background: #102418;
+  --row-bearish-background: #241012;
+  --row-neutral-attention-background: #1a1c14;
+  --row-attention-accent: #c9a227;
+
+  --badge-background: #111923;
+  --badge-text: #8391a0;
+  --alert-feed-background: #101d2a;
+  --error-panel-background: #1a1113;
+
+  --bg: var(--app-background);
+  --sidebar: var(--sidebar-background);
+  --panel: var(--panel-background);
+  --panel-raised: var(--panel-background-raised);
+  --border: var(--border-colour);
+  --border-soft: var(--border-soft-colour);
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --faint: var(--text-muted);
+  --green: var(--status-green);
+  --amber: var(--status-orange);
+  --red: var(--status-red);
+  --blue: var(--status-blue);
+  --gold: #d5a84d;
+
+  color: var(--text-primary);
+  background: var(--app-background);
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--bg); color: var(--text); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--app-background); color: var(--text-primary); }
 button, input, select { font: inherit; }
 button { color: inherit; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--status-blue); outline-offset: 2px; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 input, select {
-  width: 100%; background: #09111a; color: var(--text); border: 1px solid var(--border);
-  border-radius: 5px; padding: 9px 10px; font-family: 'IBM Plex Mono', monospace;
+  width: 100%;
+  background: var(--input-background);
+  color: var(--text-primary);
+  border: 1px solid var(--border-colour);
+  border-radius: 5px;
+  padding: 9px 10px;
+  font-family: 'IBM Plex Mono', monospace;
 }
 select { cursor: pointer; }
 h1, h2, p { margin: 0; }
